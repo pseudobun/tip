@@ -7,10 +7,10 @@ tip sits on screen all day. It must cost nothing while nothing changes.
 | Metric | Budget | Measured (olympus, one display, defaults) |
 |---|---|---|
 | Idle CPU, clock only changing | 0.0 %, ≤ 1 wakeup / 10 s outside the cpu item | — |
-| Idle CPU, every default item | — | ~0.3 % (the 2 s cpu sampler) |
-| Footprint | ≤ 25 MB at rest | 16 MB |
+| Idle CPU, every default item | — | 0.17 % (the 2 s cpu sampler) |
+| Footprint | ≤ 25 MB at rest | 22–25 MB |
 | Processes spawned per hour at rest | 0 (excluding script items) | 0 (+1 brew-refresh kick per hour) |
-| Launch → bar drawn | ≤ 200 ms | logged at start (`just log`) |
+| Launch → bar drawn | ≤ 200 ms | 290–306 ms from `open -a tip` to the socket answering |
 
 ## Rules
 
@@ -28,6 +28,36 @@ tip sits on screen all day. It must cost nothing while nothing changes.
 - **Graphs are a ring buffer and one path.** No per-point layers.
 - **Plugins are budgeted.** 30 `set`/s (the rest coalesced), 64 KB per message, 15 s per request,
   restarts after 1, 5, 30 s, then off.
+
+## Release build at rest
+
+Measured on 2026-11-12 on olympus: Mac mini, Apple M4 Pro, 24 GB, macOS 27.2, one display
+(3320 × 2040, Screen Sharing). The installed release builds from the beta casks ran together:
+paw 0.1.0-beta.21, hop 0.1.0-beta.13 and tip 0.1.0-beta.1.
+
+Idle counters come from `proc_pid_rusage` (CPU time, `ri_pkg_idle_wkups` + `ri_interrupt_wkups`,
+`ri_phys_footprint`) over 120 s with nobody at the keyboard. CLI round trips are the median and
+p90 of 50 runs after 10 warm-up runs, process start included; starting `/usr/bin/true` costs
+1.4 ms on this machine.
+
+All default items were on: workspaces, front app, brew, clock, CPU, network, markets (battery,
+VPN and media hide themselves on a Mac mini with no VPN up and nothing playing).
+
+| | |
+|---|---|
+| Idle CPU | 0.17 % (`tip bench 60`: 0.16 %) |
+| Wakeups | 5.4 per 10 s (`tip bench 60`: 6.2) |
+| Footprint | 22.3 MB (peak 23.1 MB; 25 MB after an hour) |
+| Threads | 7 |
+| markets plugin | 0.00 % CPU, 0.3 wakeups per 10 s, 5.0 MB |
+| Zen mode (every provider stopped) | 0.007 % CPU, 2.2 wakeups per 10 s, 21.7 MB |
+| App bundle / binary | 5.3 MB / 1.5 MB |
+| `open -a tip` → socket answers | 290–306 ms (3 launches) |
+| `tip status` | 8.6 ms p50, 9.4 ms p90 |
+| `tip query clock` | 9.0 ms p50, 9.6 ms p90 |
+| `tip query` (every item) | 9.4 ms p50, 10.3 ms p90 |
+
+Nearly all the idle CPU is the CPU item's 2 s sampler; zen mode shows what is left.
 
 ## Known costs
 
