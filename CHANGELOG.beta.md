@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-beta.2](https://github.com/pseudobun/tip/compare/v0.1.0-beta.1...v0.1.0-beta.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* **cask:** name the conflicting cask with its tap ([#4](https://github.com/pseudobun/tip/issues/4)) ([f5c1f97](https://github.com/pseudobun/tip/commit/f5c1f978c7fbbb892511f3ac3c4a0ea1f9cf2a59))
+
 ## [0.1.0-beta.1](https://github.com/pseudobun/tip/compare/v0.1.0-beta...v0.1.0-beta.1) (2026-11-12)
 
 
