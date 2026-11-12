@@ -16,23 +16,31 @@ enum Sampler {
         return (user + system + nice, user + system + idle + nice)
     }
 
-    /// Per-process CPU time (ns) by pid, with names.
-    static func processTimes() -> [pid_t: (time: UInt64, name: String)] {
+    /// Every pid running now.
+    static func allPids() -> [pid_t] {
         let n = proc_listallpids(nil, 0)
-        guard n > 0 else { return [:] }
+        guard n > 0 else { return [] }
         var pids = [pid_t](repeating: 0, count: Int(n) + 32)
         let got = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
-        var out: [pid_t: (UInt64, String)] = [:]
+        return pids.prefix(Int(max(got, 0))).filter { $0 > 0 }
+    }
+
+    private static let timebase: (numer: UInt64, denom: UInt64) = {
         var tb = mach_timebase_info_data_t()
         mach_timebase_info(&tb)
-        for pid in pids.prefix(Int(max(got, 0))) where pid > 0 {
-            var usage = rusage_info_v2()
+        return (UInt64(tb.numer), UInt64(max(tb.denom, 1)))
+    }()
+
+    /// CPU time (ns) of each of `pids` that answers; one syscall per pid.
+    static func processTimes(_ pids: some Sequence<pid_t>) -> [pid_t: UInt64] {
+        var out: [pid_t: UInt64] = [:]
+        var usage = rusage_info_v0()
+        for pid in pids {
             let ok = withUnsafeMutablePointer(to: &usage) {
-                $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V2, $0) }
+                $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V0, $0) }
             }
             guard ok == 0 else { continue }
-            let t = (usage.ri_user_time + usage.ri_system_time) * UInt64(tb.numer) / UInt64(max(tb.denom, 1))
-            out[pid] = (t, "")
+            out[pid] = (usage.ri_user_time + usage.ri_system_time) * timebase.numer / timebase.denom
         }
         return out
     }
@@ -65,8 +73,9 @@ final class CPUProvider: Provider {
     private let queue = DispatchQueue(label: "tip.cpu", qos: .utility)
     // Touched only on `queue`.
     private nonisolated(unsafe) var last: (busy: UInt64, total: UInt64)?
-    private nonisolated(unsafe) var lastProcs: [pid_t: (time: UInt64, name: String)] = [:]
-    private nonisolated(unsafe) var lastTop: [pid_t: UInt64] = [:]
+    private nonisolated(unsafe) var lastProcs: [pid_t: (time: UInt64, at: UInt64)] = [:]
+    private nonisolated(unsafe) var candidates: [pid_t] = []
+    private nonisolated(unsafe) var tick = 0
     private var topRows: [(String, Double)] = []
 
     override func begin() {
@@ -92,16 +101,30 @@ final class CPUProvider: Provider {
         guard let prev = last, now.total > prev.total else { return }
         let load = Double(now.busy - prev.busy) / Double(now.total - prev.total)
         var busiest: [(String, Double)] = []
-        if top {
-            let procs = Sampler.processTimes()
-            var deltas: [(pid_t, UInt64)] = []
-            for (pid, v) in procs { if let p = lastProcs[pid], v.time > p.time { deltas.append((pid, v.time - p.time)) } }
-            lastProcs = procs
-            deltas.sort { $0.1 > $1.1 }
-            let ns = interval * 1e9
-            busiest = deltas.prefix(5).map { (Sampler.name($0.0), Double($0.1) / ns) }
-        }
+        if top { busiest = self.busiest(every: Int((10 / interval).rounded(.up))) }
         DispatchQueue.main.async { MainActor.assumeIsolated { self.show(load, busiest) } }
+    }
+
+    /// The five busiest processes. Every pid is read only every `full` ticks (~10 s, ~700
+    /// syscalls); between those only the 16 busiest of the last full pass are, so a new hog shows
+    /// up within one full pass. CPU use is a rate, so mixed intervals compare fine.
+    private nonisolated func busiest(every full: Int) -> [(String, Double)] {
+        defer { tick += 1 }
+        let fullPass = tick % max(full, 1) == 0 || candidates.isEmpty
+        let now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
+        let times = Sampler.processTimes(fullPass ? Sampler.allPids() : candidates)
+        var rates: [(pid_t, Double)] = []
+        for (pid, t) in times {
+            if let p = lastProcs[pid], t >= p.time, now > p.at { rates.append((pid, Double(t - p.time) / Double(now - p.at))) }
+        }
+        if fullPass {
+            lastProcs = times.mapValues { ($0, now) }
+        } else {
+            for (pid, t) in times { lastProcs[pid] = (t, now) }
+        }
+        rates.sort { $0.1 > $1.1 }
+        if fullPass { candidates = rates.prefix(16).map(\.0) }
+        return rates.prefix(5).filter { $0.1 > 0 }.map { (Sampler.name($0.0), $0.1) }
     }
 
     private func show(_ load: Double, _ busiest: [(String, Double)]) {

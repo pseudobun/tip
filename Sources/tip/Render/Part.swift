@@ -88,6 +88,9 @@ struct PartGroup: Hashable {
     var padding: CGFloat = 0
     var height: CGFloat = 22
     var tag: String?
+    /// The fill is a layer of its own that glides to its new place (the visible workspace),
+    /// not part of the bitmap.
+    var slide = false
 }
 
 extension ItemContent {

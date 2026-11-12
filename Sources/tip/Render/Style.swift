@@ -22,6 +22,25 @@ struct Style: Equatable {
 
     // MARK: Fonts
 
+    /// Whether `s` holds a private-use code point (a Nerd Font glyph).
+    static func isNerd(_ s: String) -> Bool {
+        s.unicodeScalars.contains { (0xE000...0xF8FF).contains($0.value) || $0.value >= 0xF0000 }
+    }
+
+    private static var nerdFamily: String?? = .none
+
+    /// An installed Nerd Font (GeistMono first, the theme's own), nil when there is none.
+    static func nerdFont(size: CGFloat) -> NSFont? {
+        if nerdFamily == nil {
+            let families = NSFontManager.shared.availableFontFamilies
+            nerdFamily = .some(["GeistMono Nerd Font", "Symbols Nerd Font", "Symbols Nerd Font Mono"].first(where: families.contains)
+                ?? families.first { $0.contains("Nerd Font") && !$0.contains("Mono") && !$0.contains("Propo") }
+                ?? families.first { $0.contains("Nerd Font") })
+        }
+        guard let family = nerdFamily ?? nil else { return nil }
+        return NSFontManager.shared.font(withFamily: family, traits: [], weight: 5, size: size)
+    }
+
     private static var registered = false
     private static var cache: [String: NSFont] = [:]
 
@@ -126,8 +145,51 @@ enum Icons {
         return NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
     }
 
+    /// A bitmap drawn once at its device size, so drawing it again is a blit (no scaling from the
+    /// 1024 px icon rep, no colour conversion, no symbol layout).
+    struct Raster {
+        let image: CGImage
+        /// In points.
+        let size: CGSize
+    }
+
+    private static var rasters: [String: Raster] = [:]
+
+    static func rasterApp(_ key: String, points: CGFloat, scale: CGFloat) -> Raster? {
+        let k = "a|\(key)|\(points)|\(scale)"
+        if let r = rasters[k] { return r }
+        guard let img = app(key), let r = rasterize(img, size: CGSize(width: points, height: points), scale: scale) else { return nil }
+        rasters[k] = r
+        return r
+    }
+
+    static func rasterSymbol(_ name: String, size: CGFloat, weight: Weight, color: NSColor, scale: CGFloat) -> Raster? {
+        let c = ARGB(color)
+        let k = "s|\(name)|\(size)|\(weight.rawValue)|\(c.r),\(c.g),\(c.b),\(c.a)|\(scale)"
+        if let r = rasters[k] { return r }
+        guard let img = symbol(name, size: size, weight: weight, color: color), let r = rasterize(img, size: img.size, scale: scale) else { return nil }
+        rasters[k] = r
+        return r
+    }
+
+    private static func rasterize(_ img: NSImage, size: CGSize, scale: CGFloat) -> Raster? {
+        let w = Int(ceil(size.width * scale)), h = Int(ceil(size.height * scale))
+        guard w > 0, h > 0, let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+        else { return nil }
+        ctx.interpolationQuality = .high
+        ctx.scaleBy(x: scale, y: scale)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+        img.draw(in: CGRect(origin: .zero, size: size), from: .zero, operation: .sourceOver, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        return ctx.makeImage().map { Raster(image: $0, size: size) }
+    }
+
     static func clear() {
         apps.removeAll()
         bundleURLs.removeAll()
+        rasters.removeAll()
     }
 }

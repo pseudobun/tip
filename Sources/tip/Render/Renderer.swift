@@ -12,7 +12,18 @@ enum Renderer {
         let collapsedWidth: CGFloat
         /// Tagged groups, in the item's coordinates (origin bottom left).
         let hits: [(tag: String, rect: CGRect)]
+        /// Sliding fills (`PartGroup.slide`), in the item's coordinates.
+        var slides: [Slide] = []
     }
+
+    struct Slide {
+        let rect: CGRect
+        let color: CGColor
+        let radius: CGFloat
+    }
+
+    /// Collected while one item draws.
+    private static var drawingSlides: [Slide] = []
 
     private struct Key: Hashable {
         let parts: [Part]
@@ -25,26 +36,38 @@ enum Renderer {
     }
 
     private static var cache: [Key: Rendered] = [:]
+    /// Least recently used first.
     private static var order: [Key] = []
-    static let limit = 512
+    private static var bytes = 0
+    /// Bitmaps, not entries: the cpu graph alone makes a new one every tick, and 512 of them
+    /// held ~50 MB. Items on screen keep their bitmap in their layer anyway; the cache only has
+    /// to catch content coming back (the clock's colon, a toggled label, a second display).
+    static let byteLimit = 2 << 20
 
     static func render(_ content: ItemContent, style: Style, height: CGFloat, scale: CGFloat) -> Rendered {
         let key = Key(parts: content.parts, collapsible: content.collapsibleFrom, theme: style.theme.id, palette: style.palette,
                       font: style.theme.font, height: height, scale: scale)
-        if let r = cache[key] { return r }
+        if let r = cache[key] {
+            if let i = order.lastIndex(of: key), i != order.count - 1 { order.append(order.remove(at: i)) }
+            return r
+        }
         let r = draw(content, style: style, height: height, scale: scale)
         cache[key] = r
         order.append(key)
-        if order.count > limit {
+        bytes += cost(r)
+        while bytes > byteLimit, order.count > 1 {
             let drop = order.removeFirst()
-            cache[drop] = nil
+            if let old = cache.removeValue(forKey: drop) { bytes -= cost(old) }
         }
         return r
     }
 
+    private static func cost(_ r: Rendered) -> Int { r.image.map { $0.bytesPerRow * $0.height } ?? 0 }
+
     static func clear() {
         cache.removeAll()
         order.removeAll()
+        bytes = 0
     }
 
     // MARK: Measuring
@@ -65,15 +88,17 @@ enum Renderer {
     private static func spacingTotal(_ g: PartGroup) -> CGFloat { g.spacing }
 
     static func attributed(_ s: String, _ t: TextStyle, _ style: Style) -> NSAttributedString {
-        NSAttributedString(string: s, attributes: [
-            .font: style.font(t), .foregroundColor: style.color(t.color), .ligature: 1,
+        // Nerd Font glyphs live in the private use areas, which the theme fonts leave empty.
+        let font = (Style.isNerd(s) ? Style.nerdFont(size: t.size) : nil) ?? style.font(t)
+        return NSAttributedString(string: s, attributes: [
+            .font: font, .foregroundColor: style.color(t.color), .ligature: 1,
         ])
     }
 
     private static func glyphSize(_ g: Glyph, size: CGFloat, style: Style) -> CGSize {
         switch g {
         case .symbol(let name, let w):
-            if let img = Icons.symbol(name, size: size, weight: w, color: .white) { return img.size }
+            if let r = Icons.rasterSymbol(name, size: size, weight: w, color: .white, scale: 2) { return r.size }
             return CGSize(width: size, height: size)
         case .text(let s):
             let a = attributed(s, TextStyle(size: size, weight: .regular, color: .fg), style)
@@ -94,7 +119,7 @@ enum Renderer {
         let px = (Int(ceil(total * scale)), Int(ceil(height * scale)))
         guard let ctx = CGContext(data: nil, width: px.0, height: px.1, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) else {
             return Rendered(image: nil, size: size, collapsedWidth: collapsed, hits: [])
         }
         ctx.scaleBy(x: scale, y: scale)
@@ -102,13 +127,14 @@ enum Renderer {
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = ns
         var hits: [(String, CGRect)] = []
+        drawingSlides = []
         var x: CGFloat = 0
         for (part, w) in zip(content.parts, widths) {
             draw(part, at: x, width: w, midY: height / 2, style: style, ctx: ctx, hits: &hits)
             x += w
         }
         NSGraphicsContext.restoreGraphicsState()
-        return Rendered(image: ctx.makeImage(), size: size, collapsedWidth: collapsed, hits: hits)
+        return Rendered(image: ctx.makeImage(), size: size, collapsedWidth: collapsed, hits: hits, slides: drawingSlides)
     }
 
     private static func draw(_ part: Part, at x: CGFloat, width w: CGFloat, midY: CGFloat, style: Style, ctx: CGContext,
@@ -155,7 +181,9 @@ enum Renderer {
             break
         case .group(let g):
             let rect = CGRect(x: x, y: midY - g.height / 2, width: w, height: g.height)
-            if let fill = g.fill {
+            if let fill = g.fill, g.slide {
+                drawingSlides.append(Slide(rect: rect, color: style.cg(fill), radius: min(g.radius, g.height / 2)))
+            } else if let fill = g.fill {
                 style.color(fill).setFill()
                 NSBezierPath(roundedRect: rect, xRadius: min(g.radius, g.height / 2), yRadius: min(g.radius, g.height / 2)).fill()
             }
@@ -169,20 +197,32 @@ enum Renderer {
         }
     }
 
+    /// The current context's device scale (2 on Retina).
+    private static func deviceScale() -> CGFloat {
+        NSGraphicsContext.current.map { $0.cgContext.userSpaceToDeviceSpaceTransform.a } ?? 2
+    }
+
+    private static func blit(_ img: CGImage, _ rect: CGRect, _ alpha: CGFloat) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        ctx.saveGState()
+        ctx.setAlpha(alpha)
+        ctx.draw(img, in: rect)
+        ctx.restoreGState()
+    }
+
     private static func drawGlyph(_ g: Glyph, x: CGFloat, midY: CGFloat, size: CGFloat, color: NSColor, alpha: CGFloat, style: Style) {
         switch g {
         case .symbol(let name, let w):
-            guard let img = Icons.symbol(name, size: size, weight: w, color: color) else { return }
-            img.draw(in: CGRect(x: x, y: midY - img.size.height / 2, width: img.size.width, height: img.size.height),
-                     from: .zero, operation: .sourceOver, fraction: alpha)
+            guard let r = Icons.rasterSymbol(name, size: size, weight: w, color: color, scale: deviceScale()) else { return }
+            blit(r.image, CGRect(x: x, y: midY - r.size.height / 2, width: r.size.width, height: r.size.height), alpha)
         case .text(let s):
             let a = attributed(s, TextStyle(size: size, weight: .regular, color: .rgb(ARGB(color))), style)
             let sz = a.size()
             a.draw(at: CGPoint(x: x, y: midY - sz.height / 2))
         case .app(let key):
-            guard let img = Icons.app(key) else { return }
             let s = size + 2
-            img.draw(in: CGRect(x: x, y: midY - s / 2, width: s, height: s), from: .zero, operation: .sourceOver, fraction: alpha)
+            guard let r = Icons.rasterApp(key, points: s, scale: deviceScale()) else { return }
+            blit(r.image, CGRect(x: x, y: midY - s / 2, width: s, height: s), alpha)
         case .file(let path):
             guard let img = NSImage(contentsOfFile: (path as NSString).expandingTildeInPath) else { return }
             let s = size + 2

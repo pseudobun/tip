@@ -57,12 +57,16 @@ public struct TipConfig: Codable, Equatable, Sendable {
         public var iconGap = 5.0
         /// "solid" (theme fill) or "glass" (Liquid Glass).
         public var material = "solid"
+        /// Item ids whose island draws no card: the items float on the bar (the Apple logo).
+        public var bare = ["apple"]
         public init() {}
     }
 
     public struct Animation: Codable, Equatable, Sendable {
         public var enabled = true
         public var durationMs = 220.0
+        /// Items changing their own content (a new app name, a price): short, so the bar feels instant.
+        public var contentMs = 80.0
         /// linear | easeOutCubic | easeOutQuint | easeInOut | spring
         public var easing = "easeOutCubic"
         public init() {}
@@ -264,20 +268,20 @@ extension TipConfig.Bar.Margin {
 }
 
 extension TipConfig.Island {
-    enum CodingKeys: String, CodingKey, CaseIterable { case height, radius, gap, padding, spacing, iconGap, material }
+    enum CodingKeys: String, CodingKey, CaseIterable { case height, radius, gap, padding, spacing, iconGap, material, bare }
     public init(from decoder: Decoder) throws {
         let f = Fields(c: try decoder.container(keyedBy: CodingKeys.self))
         try f(.height, &height); try f(.gap, &gap); try f(.padding, &padding); try f(.spacing, &spacing)
-        try f(.iconGap, &iconGap); try f(.material, &material)
+        try f(.iconGap, &iconGap); try f(.material, &material); try f(.bare, &bare)
         radius = try f.c.decodeIfPresent(Double.self, forKey: .radius)
     }
 }
 
 extension TipConfig.Animation {
-    enum CodingKeys: String, CodingKey, CaseIterable { case enabled, durationMs, easing }
+    enum CodingKeys: String, CodingKey, CaseIterable { case enabled, durationMs, contentMs, easing }
     public init(from decoder: Decoder) throws {
         let f = Fields(c: try decoder.container(keyedBy: CodingKeys.self))
-        try f(.enabled, &enabled); try f(.durationMs, &durationMs); try f(.easing, &easing)
+        try f(.enabled, &enabled); try f(.durationMs, &durationMs); try f(.contentMs, &contentMs); try f(.easing, &easing)
     }
 }
 

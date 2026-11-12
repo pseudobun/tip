@@ -19,7 +19,8 @@ tip sits on screen all day. It must cost nothing while nothing changes.
 - **Redraw only what changed, once per run-loop turn.** Providers call `set`; equal content is
   dropped; BarManager marks the bars dirty and redraws on the next turn, however many items changed.
 - **One bitmap per item, cached.** The renderer draws an item's parts into one image, cached by
-  (content, theme, scale), LRU 512. An unchanged item costs a dictionary lookup.
+  (content, theme, scale), LRU within 2 MB of bitmaps (the cpu graph makes a new one every tick).
+  App icons and SF Symbols are rasterized once at device size, so drawing them is a blit.
 - **Hidden items stop their providers.** Zen mode, items not in the layout and items filtered off
   every display stop their timers and listeners; on-demand plugins stop too.
 - **Event payloads only for subscribers.** `itemChanged` is encoded only when someone runs

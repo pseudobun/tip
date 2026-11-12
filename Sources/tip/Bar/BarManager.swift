@@ -22,7 +22,12 @@ final class BarManager: ProviderHost {
     private(set) var zen = false
     let popup = PopupController()
     private var dirty = false
-    private var animateNext = false
+    /// How the next redraw moves: none, an item's content (short) or the layout (full duration).
+    enum Motion: Int, Comparable {
+        case none, content, layout
+        static func < (a: Motion, b: Motion) -> Bool { a.rawValue < b.rawValue }
+    }
+    private var animateNext = Motion.none
     /// Theme preview from Settings (hovering a tile): drawn instead of the config's theme.
     var previewTheme: BarTheme? { didSet { restyle() } }
 
@@ -233,7 +238,7 @@ final class BarManager: ProviderHost {
             guard contents[item] != content else { return }
             contents[item] = content
         }
-        markDirty(animate: true)
+        markDirty(animate: true, content: true)
         if EventBus.shared.hasSubscribers { publish("itemChanged", ["item": item]) }
     }
 
@@ -246,7 +251,7 @@ final class BarManager: ProviderHost {
             graphs[node] = ring
         }
         overrides[node] = (overrides[node] ?? ItemSpec(id: node)).merged(with: spec)
-        markDirty(animate: true)
+        markDirty(animate: true, content: true)
         if EventBus.shared.hasSubscribers { publish("itemChanged", ["item": node]) }
     }
 
@@ -288,8 +293,8 @@ final class BarManager: ProviderHost {
 
     // MARK: Redraw
 
-    func markDirty(animate: Bool = false) {
-        animateNext = animateNext || animate
+    func markDirty(animate: Bool = false, content: Bool = false) {
+        animateNext = max(animateNext, animate ? (content ? .content : .layout) : .none)
         guard !dirty else { return }
         dirty = true
         // Once per run-loop turn, however many items changed.
@@ -301,7 +306,7 @@ final class BarManager: ProviderHost {
     private func redraw() {
         dirty = false
         let animate = animateNext
-        animateNext = false
+        animateNext = .none
         for (id, bar) in bars {
             guard let screen = screen(for: id) else { continue }
             bar.render(model(for: bar.display), manager: self, screen: screen, animate: animate)

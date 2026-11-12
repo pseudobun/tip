@@ -76,18 +76,44 @@ final class PawClient {
         }
         Thread.detachNewThread { [weak self] in
             var got = false
+            var last: [Workspace] = []
+            var focused: String?
             _ = IPC.stream("subscribe snapshot,workspaceChanged,windowsChanged,windowFocused,zoomChanged,displaysChanged,setupChanged",
                            socketPath: path) { line in
                 got = true
                 guard let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { return }
                 let data = obj["data"] as? [String: Any]
                 var list = data?["workspaces"] as? [[String: Any]]
+                // Focus moving inside the focused workspace changes nothing tip draws: no query.
+                if list == nil, obj["event"] as? String == "windowFocused", let ws = data?["workspace"] as? String {
+                    if ws == focused { return }
+                    // Focus moved to another workspace: draw it now from what we know (no query
+                    // round trip); paw's workspaceChanged follows with the full state.
+                    if let target = last.first(where: { $0.name == ws }) {
+                        // paw's shape: the visible workspace carries its display, hidden ones 0.
+                        // A hidden target comes up on the focused display, replacing what showed there.
+                        let display = target.visible ? target.displayID : (last.first(where: \.focused)?.displayID ?? 0)
+                        let patched = last.map { w in
+                            var w = w
+                            w.focused = w.name == ws
+                            if w.name == ws { w.visible = true; w.displayID = display }
+                            else if !target.visible, w.visible, w.displayID == display { w.visible = false; w.displayID = 0 }
+                            return w
+                        }
+                        last = patched
+                        focused = ws
+                        DispatchQueue.main.async { MainActor.assumeIsolated { self?.update(patched, gen: gen) } }
+                        return
+                    }
+                }
                 if list == nil, case .success(let r) = IPC.send("query", timeout: 3, socketPath: path),
                    let json = r["json"] as? String {
                     list = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]
                 }
                 guard let list else { return }
                 let parsed = Self.parse(list)
+                last = parsed
+                focused = parsed.first(where: \.focused)?.name
                 DispatchQueue.main.async { MainActor.assumeIsolated { self?.update(parsed, gen: gen) } }
             }
             DispatchQueue.main.async {
@@ -194,7 +220,7 @@ final class WorkspacesProvider: Provider {
                 }
                 inner.append(.space(apps.isEmpty ? 5 : 4))
                 if !parts.isEmpty { parts.append(.space(2)) }
-                parts.append(.group(PartGroup(parts: inner, spacing: 2, fill: ws.visible ? .token(.muted) : nil, radius: 7, height: 22, tag: ws.name)))
+                parts.append(.group(PartGroup(parts: inner, spacing: 2, fill: ws.visible ? .token(.muted) : nil, radius: 7, height: 22, tag: ws.name, slide: true)))
             }
             if options.bool("creator", true) {
                 parts.append(.space(2))
@@ -242,3 +268,4 @@ final class ZoomProvider: Provider {
         return true
     }
 }
+

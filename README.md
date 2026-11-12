@@ -171,7 +171,7 @@ and column, and suggests the key you probably meant.
 {
   theme: "og",
   bar: { height: 40, margin: { left: 25, right: 34 } },
-  island: { height: 28, gap: 6, padding: 10, spacing: 10, material: "solid" },
+  island: { height: 28, gap: 6, padding: 10, spacing: 10, material: "solid", bare: ["apple"] },
 
   layout: {
     default: {

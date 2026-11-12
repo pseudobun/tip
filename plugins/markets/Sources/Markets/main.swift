@@ -1,3 +1,4 @@
+import CoreText
 import Foundation
 import TipPluginKit
 
@@ -25,17 +26,30 @@ final class Markets: TipPlugin {
         return initial()
     }
 
+    /// Nerd Font glyphs (the old SketchyBar look) when one is installed, SF Symbols otherwise.
+    private static let nerd: Bool = {
+        let families = CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? []
+        return families.contains { $0.contains("Nerd Font") }
+    }()
+
+    private enum Icon {
+        static let btc = nerd ? "\u{F0813}" : "sf:bitcoinsign"
+        static let eth = nerd ? "\u{F086A}" : "Ξ"
+        static let gas = nerd ? "\u{F0298}" : "sf:fuelpump.fill"
+        static let nyse = nerd ? "\u{F081F}" : "sf:building.columns.fill"
+    }
+
     private func chart(_ symbol: String) -> String {
         (prefs["chartURL"]?.string ?? "https://www.tradingview.com/chart/?symbol=BINANCE:{symbol}").replacingOccurrences(of: "{symbol}", with: symbol)
     }
 
     private func initial() -> [Item] {
         let items = [
-            Item("btc").icon("sf:bitcoinsign", color: "chart3").label("–").click("open:" + chart("BTCUSDT")).tooltip("Bitcoin"),
-            Item("eth").icon("Ξ", color: "chart1").label("–").click("open:" + chart("ETHUSDT")).tooltip("Ether"),
-            Item("gas").icon("sf:fuelpump.fill", color: "chart2").label("–").click("open:https://etherscan.io/gastracker")
+            Item("btc").icon(Icon.btc, color: "chart3").label("–").click("open:" + chart("BTCUSDT")).tooltip("Bitcoin"),
+            Item("eth").icon(Icon.eth, color: "chart1").label("–").click("open:" + chart("ETHUSDT")).tooltip("Ether"),
+            Item("gas").icon(Icon.gas, color: "chart2").label("–").click("open:https://etherscan.io/gastracker")
                 .tooltip("ETH base fee (gwei)").drawing(!key.isEmpty),
-            Item("nyse").icon("sf:building.columns.fill", color: "dim").label("").drawing(prefs["nyse"]?.bool ?? true),
+            Item("nyse").icon(Icon.nyse, color: "dim").label("").drawing(prefs["nyse"]?.bool ?? true),
         ]
         return items
     }
@@ -114,7 +128,7 @@ final class Markets: TipPlugin {
         let dow = ((c.weekday ?? 1) + 5) % 7 + 1 // ISO: 1 = Monday … 7 = Sunday
         let minute = (c.hour ?? 0) * 60 + (c.minute ?? 0)
         let (open, left) = Self.session(weekday: dow, minute: minute)
-        tip.set(Item("nyse").icon("sf:building.columns.fill", color: open ? "good" : "dim")
+        tip.set(Item("nyse").icon(Icon.nyse, color: open ? "good" : "dim")
             .label(Self.countdown(left), color: open ? "good" : "muted")
             .tooltip(open ? "NYSE open, closes in \(Self.countdown(left))" : "NYSE closed, opens in \(Self.countdown(left))"))
     }

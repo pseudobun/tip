@@ -27,6 +27,8 @@ final class Bar {
     private var islandLayers: [String: CALayer] = [:]
     private var glassViews: [String: NSView] = [:]
     private var itemLayers: [String: CALayer] = [:]
+    /// Sliding highlights by item layer key and index, under their item.
+    private var slideLayers: [String: [CALayer]] = [:]
     /// Where each node sits (view coordinates), for clicks and popups.
     private(set) var hits: [(node: String, rect: CGRect, tags: [(String, CGRect)])] = []
     private var errorDot: CALayer?
@@ -66,7 +68,7 @@ final class Bar {
 
     // MARK: Drawing
 
-    func render(_ model: BarModel, manager m: BarManager, screen: NSScreen, animate: Bool) {
+    func render(_ model: BarModel, manager m: BarManager, screen: NSScreen, animate: BarManager.Motion) {
         let style = m.style
         let cfg = m.store.config
         let scale = screen.backingScaleFactor
@@ -96,10 +98,12 @@ final class Bar {
             left: left.map { Double($0.width) }, center: center.map { Double($0.width) }, right: right.map { Double($0.width) }))
 
         CATransaction.begin()
-        let motion = animate && cfg.animation.enabled && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let ms = animate == .content ? min(cfg.animation.contentMs, cfg.animation.durationMs) : cfg.animation.durationMs
+        let motionAllowed = cfg.animation.enabled && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let motion = animate != .none && ms > 0 && motionAllowed
         CATransaction.setDisableActions(!motion)
         if motion {
-            CATransaction.setAnimationDuration(cfg.animation.durationMs / 1000)
+            CATransaction.setAnimationDuration(ms / 1000)
             let b = Easing.bezier(cfg.animation.easing)
             CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: Float(b.0), Float(b.1), Float(b.2), Float(b.3)))
         }
@@ -125,8 +129,11 @@ final class Bar {
                 } else {
                     layer.frame = frame
                 }
-                decorate(layer, style: style, material: cfg.island.material)
-                syncGlass(key, frame: frame, style: style, on: cfg.island.material == "glass")
+                let bare = mi.items.allSatisfy { item in
+                    cfg.island.bare.contains(item.node) || cfg.island.bare.contains(String(item.node.prefix { $0 != "." }))
+                }
+                decorate(layer, style: style, material: bare ? "bare" : cfg.island.material)
+                syncGlass(key, frame: frame, style: style, on: !bare && cfg.island.material == "glass")
                 var ix = pad
                 for item in mi.items {
                     let ikey = key + "|" + item.node
@@ -142,6 +149,7 @@ final class Bar {
                     if fresh { il.frame = CGRect(x: ix, y: 0, width: item.width, height: ih) }
                     CATransaction.commit()
                     il.frame = CGRect(x: ix, y: 0, width: item.width, height: ih)
+                    syncSlides(ikey, item.r.slides, x: ix, island: layer, below: il, glide: motionAllowed, ms: cfg.animation.durationMs)
                     let rect = CGRect(x: frame.minX + ix, y: frame.minY, width: item.width, height: ih)
                     let tags = item.r.hits.map { ($0.tag, $0.rect.offsetBy(dx: rect.minX, dy: rect.minY)) }
                     newHits.append((item.node, rect, tags))
@@ -153,6 +161,10 @@ final class Bar {
             l.removeFromSuperlayer()
             islandLayers[k] = nil
             glassViews.removeValue(forKey: k)?.removeFromSuperview()
+        }
+        for (k, ls) in slideLayers where !seenItems.contains(k) {
+            ls.forEach { $0.removeFromSuperlayer() }
+            slideLayers[k] = nil
         }
         for (k, l) in itemLayers where !seenItems.contains(k) {
             l.removeFromSuperlayer()
@@ -172,6 +184,36 @@ final class Bar {
         return l
     }
 
+    /// Places an item's sliding highlights; a moved one glides there over `ms`, a new one appears.
+    private func syncSlides(_ key: String, _ slides: [Renderer.Slide], x: CGFloat, island: CALayer, below item: CALayer,
+                            glide: Bool, ms: Double) {
+        var layers = slideLayers[key] ?? []
+        while layers.count > slides.count { layers.removeLast().removeFromSuperlayer() }
+        for (i, s) in slides.enumerated() {
+            let frame = s.rect.offsetBy(dx: x, dy: 0)
+            let fresh = i >= layers.count
+            if fresh {
+                let l = CALayer()
+                l.cornerCurve = .continuous
+                layers.append(l)
+            }
+            let l = layers[i]
+            if l.superlayer !== island { island.insertSublayer(l, below: item) }
+            CATransaction.begin()
+            if fresh || !glide || l.frame == frame {
+                CATransaction.setDisableActions(true)
+            } else {
+                CATransaction.setAnimationDuration(ms / 1000)
+                CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1))
+            }
+            l.frame = frame
+            l.backgroundColor = s.color
+            l.cornerRadius = s.radius
+            CATransaction.commit()
+        }
+        slideLayers[key] = layers
+    }
+
     private func makeItem(in island: CALayer) -> CALayer {
         let l = CALayer()
         l.contentsGravity = .left
@@ -182,6 +224,12 @@ final class Bar {
     }
 
     private func decorate(_ l: CALayer, style: Style, material: String) {
+        if material == "bare" {
+            l.backgroundColor = nil
+            l.borderWidth = 0
+            l.shadowOpacity = 0
+            return
+        }
         let glass = material == "glass"
         l.backgroundColor = glass ? style.palette.card.alpha(min(style.palette.card.a, 0.25)).cg : style.palette.card.cg
         l.borderColor = style.palette.border.cg

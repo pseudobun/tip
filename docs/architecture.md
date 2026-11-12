@@ -247,7 +247,7 @@ Rules:
     displays: "all",                // all | main | ["DELL U3223QE", ...]
   },
   island: { height: 28, radius: 9, gap: 6, padding: 5, material: "solid" }, // solid | glass
-  animation: { durationMs: 220, easing: "easeOutCubic" },
+  animation: { durationMs: 220, contentMs: 80, easing: "easeOutCubic" },
 
   // Layout per display kind; ids refer to items below -------------------------
   layout: {
@@ -338,7 +338,7 @@ Rules (in `PERFORMANCE.md` from day one, with a "Known costs" section):
 - Redraw only dirty layers, one `CATransaction` per run-loop turn.
 - Hidden items (zen, other display, `drawing: false`) stop their provider work.
 - Event payloads encoded only when a subscriber exists.
-- Text and symbol bitmaps cached by (content, font, colour, scale), LRU 512.
+- Item bitmaps cached by (content, font, colour, scale), LRU within 2 MB; app icons and symbols pre-rasterized at device size.
 - Graphs: one `CGPath` rebuild per sample, ring buffer, no per-point layers.
 
 ---
