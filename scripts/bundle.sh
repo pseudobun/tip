@@ -36,7 +36,7 @@ build="${TIP_BUILD:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 arch_flags=""; for a in ${TIP_ARCHS:-arm64}; do arch_flags="$arch_flags --arch $a"; done
 swift build -c release $arch_flags -q -Xlinker -dead_strip
 bin_dir="$(swift build -c release $arch_flags -Xlinker -dead_strip --show-bin-path)"
-sparkle="$(find "$bin_dir" "$bin_dir/PackageFrameworks" -maxdepth 1 -name Sparkle.framework 2>/dev/null | head -1)"
+sparkle="$( { find "$bin_dir" "$bin_dir/PackageFrameworks" -maxdepth 1 -name Sparkle.framework 2>/dev/null || true; } | head -1)"
 [ -n "$sparkle" ] || { echo "Sparkle.framework not found in $bin_dir" >&2; exit 1; }
 # EdDSA key that signs updates (private half: the SPARKLE_PRIVATE_KEY secret and olympus' keychain, account "tip").
 sparkle_key="${TIP_SPARKLE_PUBLIC_KEY-4WvZKUleRShEusDyhdMZI8l5WyDvxjU/1A+dvimWeac=}"

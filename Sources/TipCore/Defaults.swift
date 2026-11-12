@@ -6,7 +6,7 @@ public enum Defaults {
         "default": TipConfig.Zones(
             left: [["apple"], ["workspaces"], ["zoom"], ["front_app"], ["brew"]],
             center: [["media"]],
-            right: [["markets"], ["cpu", "net", "battery"], ["clock"]]),
+            right: [["markets"], ["cpu", "net", "vpn", "battery"], ["clock"]]),
         // The notch sits where the center zone would be.
         "builtin": TipConfig.Zones(center: []),
     ]
@@ -22,6 +22,7 @@ public enum Defaults {
         "clock": ItemConfig(["provider": "clock", "click": "zen"]),
         "battery": ItemConfig(["provider": "battery"]),
         "net": ItemConfig(["provider": "network", "click": "toggle-label"]),
+        "vpn": ItemConfig(["provider": "vpn", "click": "toggle-label"]),
         "cpu": ItemConfig(["provider": "cpu"]),
         "markets": ItemConfig(["plugin": "com.pseudobun.tip.markets"]),
     ]
@@ -110,15 +111,17 @@ public enum ProviderCatalog {
                          .init("warnBelow", .number, 30, "Orange below this percent."),
                          .init("badBelow", .number, 20, "Red below this percent."),
                      ]),
-        ProviderSpec(id: "network", name: "Network", summary: "Wi-Fi, cable, iPhone or offline, VPN, and the address.", symbol: "wifi",
+        ProviderSpec(id: "network", name: "Network", summary: "Wi-Fi, cable (LAN), iPhone or offline, and the address.", symbol: "wifi",
                      source: "SystemConfiguration (SCDynamicStore)", options: [
                          .init("label", .choice, "collapsed", "The IP label: collapsed (click opens), shown or hidden.",
                                choices: ["collapsed", "shown", "hidden"]),
-                         .init("vpn", .toggle, true, "Show a VPN when one carries IPv4."),
+                         .init("vpn", .toggle, false, "Show a lock instead of the link while a VPN is up (the `vpn` item does this on its own)."),
                      ]),
-        ProviderSpec(id: "vpn", name: "VPN", summary: "A lock while a VPN tunnel is up.", symbol: "lock.shield",
-                     source: "SystemConfiguration (SCDynamicStore)", options: [
-                         .init("hideWhenOff", .toggle, true, "Hide without a tunnel."),
+        ProviderSpec(id: "vpn", name: "VPN", summary: "A lock and the VPN's name while one is connected (split-tunnel WireGuard too).",
+                     symbol: "lock.shield", source: "SCNetworkConnection status callbacks", options: [
+                         .init("hideWhenOff", .toggle, true, "Hide without a VPN."),
+                         .init("label", .choice, "collapsed", "The name: collapsed (click opens), shown or hidden.",
+                               choices: ["collapsed", "shown", "hidden"]),
                      ]),
         ProviderSpec(id: "cpu", name: "CPU", summary: "Load, its graph and the busiest process.", symbol: "cpu",
                      source: "mach host_statistics (timer)", options: [

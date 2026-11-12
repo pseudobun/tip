@@ -69,12 +69,14 @@ final class MediaProvider: Provider {
         }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: exe)
-        p.arguments = ["stream"]
+        p.arguments = ["stream", "--no-diff", "--no-artwork", "--debounce=250"]
         let out = Pipe()
         p.standardOutput = out
         p.standardError = FileHandle.nullDevice
-        var buffer = Data()
+        let box = LineBuffer()
         out.fileHandleForReading.readabilityHandler = { [weak self] h in
+            var buffer = box.data
+            defer { box.data = buffer }
             let chunk = h.availableData
             guard !chunk.isEmpty else { h.readabilityHandler = nil; return }
             buffer.append(chunk)
@@ -163,6 +165,9 @@ final class MediaProvider: Provider {
         return rows
     }
 }
+
+/// Bytes read so far from a pipe; touched only by its serial readability handler.
+final class LineBuffer: @unchecked Sendable { var data = Data() }
 
 // MARK: - Homebrew
 

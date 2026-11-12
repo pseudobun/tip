@@ -106,7 +106,8 @@ Every built-in item listens to the system instead of polling a script:
 |---|---|---|
 | `clock` | timer aligned to the minute | minute boundary, clock/zone change, wake |
 | `battery` | IOPowerSources notifications | power source change |
-| `network` / `vpn` | SystemConfiguration (SCDynamicStore) | link or address change, a cable plug, VPN up/down |
+| `network` | SystemConfiguration (SCDynamicStore) | link or address change, a cable plug (Wi-Fi, LAN, iPhone) |
+| `vpn` | SCNetworkConnection status callbacks | a VPN service connecting (split-tunnel WireGuard too) |
 | `cpu` | mach `host_statistics`, libproc per-process times | interval (2 s) |
 | `memory`, `disk` | mach `host_statistics64`, volume resource values | interval, mounts |
 | `front_app` | NSWorkspace activation | app switch |
@@ -176,7 +177,7 @@ and column, and suggests the key you probably meant.
     default: {
       left: [["apple"], ["workspaces"], ["zoom"], ["front_app"], ["brew"]],
       center: [["media"]],
-      right: [["markets"], ["cpu", "net", "battery"], ["clock"]],
+      right: [["markets"], ["cpu", "net", "vpn", "battery"], ["clock"]],
     },
     builtin: { center: [] },              // the laptop's notch sits there
     "DELL U3223QE": { right: [["cpu"], ["clock"]] },

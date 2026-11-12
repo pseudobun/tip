@@ -203,7 +203,7 @@ extension CLI {
             let found = Set(PluginHost.discover().map(\.manifest.id))
             for id in used.sorted() { say(found.contains(id), "plugin \(id) \(found.contains(id) ? "is installed" : "is used but not installed (tip plugins install …)")") }
             if s.config.items.values.contains(where: { $0.provider == "media" }) {
-                say(Shell.which("media-control") != nil, "media needs media-control (brew install media-control)")
+                say(Shell.which("media-control") != nil, Shell.which("media-control") != nil ? "media-control is installed (now playing)" : "media needs media-control: brew install media-control")
             }
             let paw = PawClient.socketPaths.contains { FileManager.default.fileExists(atPath: $0) }
             print("\(paw ? "✓" : "·") paw \(paw ? "is running: workspaces come from its socket" : "is not running: the workspaces island stays empty")")

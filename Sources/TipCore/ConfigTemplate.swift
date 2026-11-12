@@ -41,7 +41,7 @@ public enum ConfigTemplate {
         default: {
           left: [["apple"], ["workspaces"], ["zoom"], ["front_app"], ["brew"]],
           center: [["media"]],
-          right: [["markets"], ["cpu", "net", "battery"], ["clock"]],
+          right: [["markets"], ["cpu", "net", "vpn", "battery"], ["clock"]],
         },
         builtin: { center: [] },
       },
@@ -62,6 +62,7 @@ public enum ConfigTemplate {
         clock: { provider: "clock", click: "zen" },
         battery: { provider: "battery" },
         net: { provider: "network", click: "toggle-label" },
+        vpn: { provider: "vpn", click: "toggle-label" },
         cpu: { provider: "cpu" },
         markets: { plugin: "com.pseudobun.tip.markets" },
         // uptime: { command: "uptime | sed 's/.*up \\\\([^,]*\\\\),.*/\\\\1/'", interval: 300, icon: "sf:clock.arrow.circlepath" },
@@ -73,7 +74,7 @@ public enum ConfigTemplate {
       // Installed plugins' preferences by id; `${NAME}` reads ~/.config/tip/.env.
       plugins: {
         disabled: [],
-        // "com.pseudobun.tip.markets": { symbols: ["BTCUSDT", "ETHUSDT"], etherscanKey: "${ETH_API_KEY}" },
+        // "com.pseudobun.tip.markets": { etherscanKey: "${ETH_API_KEY}" },
       },
 
       openAtLogin: false,

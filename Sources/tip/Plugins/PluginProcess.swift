@@ -139,9 +139,14 @@ final class PluginProcess {
         DispatchQueue.global(qos: .utility).async { try? input.write(contentsOf: data) }
     }
 
+    /// Bytes read so far; touched only by the handle's serial readability handler.
+    private final class Buffer: @unchecked Sendable { var data = Data() }
+
     private static func readLines(_ handle: FileHandle, limit: Int, _ onLine: @escaping @MainActor (Data) -> Void) {
-        var buffer = Data()
+        let box = Buffer()
         handle.readabilityHandler = { h in
+            var buffer = box.data
+            defer { box.data = buffer }
             let chunk = h.availableData
             guard !chunk.isEmpty else { h.readabilityHandler = nil; return }
             buffer.append(chunk)

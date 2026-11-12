@@ -90,12 +90,17 @@ final class NetworkMonitor {
         var interface: String?
         var ip: String?
         var router: String?
-        var vpn: [String] = [] // utun interfaces with IPv4
+        /// Connected VPN services by name (WireGuard, Tailscale, IPSec…), as `scutil --nc list`
+        /// shows them: split-tunnel WireGuard never appears in the routing table.
+        var vpn: [String] = []
+        /// Tunnels carrying IPv4 (utunN), for the popup.
+        var tunnels: [String] = []
         var vpnAddress: String?
     }
 
     private(set) var state = State()
     private var store: SCDynamicStore?
+    private var connections: [(name: String, conn: SCNetworkConnection)] = []
     private var listeners: [ObjectIdentifier: (State) -> Void] = [:]
     private let queue = DispatchQueue(label: "tip.network")
 
@@ -116,21 +121,50 @@ final class NetworkMonitor {
             DispatchQueue.main.async { MainActor.assumeIsolated { NetworkMonitor.shared.refresh() } }
         }, &ctx) else { return }
         let keys = ["State:/Network/Global/IPv4"] as CFArray
-        let patterns = ["State:/Network/Interface/.*/IPv4", "State:/Network/Interface/.*/Link"] as CFArray
+        let patterns = ["State:/Network/Interface/.*/IPv4", "State:/Network/Interface/.*/Link", "Setup:/Network/Service/.*",
+                        "State:/Network/Service/.*/IPv4"] as CFArray
         SCDynamicStoreSetNotificationKeys(s, keys, patterns)
         SCDynamicStoreSetDispatchQueue(s, queue)
         store = s
+        watchVPNServices()
         refresh()
     }
 
     private func stop() {
         if let store { SCDynamicStoreSetDispatchQueue(store, nil) }
         store = nil
+        for c in connections { SCNetworkConnectionUnscheduleFromRunLoop(c.conn, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue) }
+        connections = []
     }
 
-    func refresh() {
+    /// Every VPN service in the current set, each with a status callback (connect / disconnect).
+    private func watchVPNServices() {
+        for c in connections { SCNetworkConnectionUnscheduleFromRunLoop(c.conn, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue) }
+        connections = []
+        guard let prefs = SCPreferencesCreate(nil, "tip" as CFString, nil), let set = SCNetworkSetCopyCurrent(prefs),
+              let services = SCNetworkSetCopyServices(set) as? [SCNetworkService] else { return }
+        let vpnTypes: Set<String> = [kSCNetworkInterfaceTypePPP as String, kSCNetworkInterfaceTypeIPSec as String, "VPN", "com.apple.payload"]
+        for service in services where SCNetworkServiceGetEnabled(service) {
+            guard let iface = SCNetworkServiceGetInterface(service), let type = SCNetworkInterfaceGetInterfaceType(iface) as String?,
+                  vpnTypes.contains(type) || type.hasPrefix("VPN"), let id = SCNetworkServiceGetServiceID(service) else { continue }
+            var ctx = SCNetworkConnectionContext(version: 0, info: nil, retain: nil, release: nil, copyDescription: nil)
+            guard let conn = SCNetworkConnectionCreateWithServiceID(nil, id, { _, _, _ in
+                DispatchQueue.main.async { MainActor.assumeIsolated { NetworkMonitor.shared.refresh(force: true) } }
+            }, &ctx) else { continue }
+            SCNetworkConnectionScheduleWithRunLoop(conn, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+            connections.append(((SCNetworkServiceGetName(service) as String?) ?? "VPN", conn))
+        }
+    }
+
+    private var servicesStamp = 0
+
+    func refresh(force: Bool = false) {
         guard let store else { return }
-        let next = Self.read(store)
+        // A service added or removed in Network settings: watch the new set.
+        let count = (SCDynamicStoreCopyKeyList(store, "Setup:/Network/Service/[^/]+" as CFString) as? [String])?.count ?? 0
+        if count != servicesStamp { servicesStamp = count; watchVPNServices() }
+        var next = Self.read(store)
+        next.vpn = connections.filter { SCNetworkConnectionGetStatus($0.conn) == .connected }.map(\.name)
         guard next != state else { return }
         state = next
         for l in listeners.values { l(next) }
@@ -147,8 +181,7 @@ final class NetworkMonitor {
         for key in keys.sorted() {
             let v = SCDynamicStoreCopyValue(store, key as CFString) as? [String: Any]
             if let addrs = v?["Addresses"] as? [String], let a = addrs.first {
-                let name = key.split(separator: "/")[3]
-                st.vpn.append(String(name))
+                st.tunnels.append(String(key.split(separator: "/")[3]))
                 if st.vpnAddress == nil { st.vpnAddress = a }
             }
         }
@@ -200,14 +233,20 @@ final class NetworkProvider: Provider {
     override func end() { NetworkMonitor.shared.remove(self) }
 
     private func show(_ s: NetworkMonitor.State) {
-        let vpn = options.bool("vpn", true) && !s.vpn.isEmpty
-        let symbol = vpn ? "lock.shield.fill" : NetworkMonitor.symbol(s.kind)
-        let tone: Paint = vpn ? .token(.chart1) : s.kind == .offline ? .dim : .fg
-        let text = vpn ? "VPN" : (s.ip ?? "offline")
+        // The primary link: Wi-Fi, cable (LAN), iPhone or offline. VPNs are the `vpn` item.
+        let (symbol, tone, kind): (String, Paint, String) = switch s.kind {
+        case .wifi: ("wifi", .fg, "Wi-Fi")
+        case .iphone: ("iphone", .warn, "iPhone")
+        case .ethernet, .thunderbolt, .other: ("cable.connector", .good, "LAN")
+        case .offline: ("wifi.slash", .dim, "offline")
+        }
+        let showVPN = options.bool("vpn", false) && !s.vpn.isEmpty
+        let text = s.kind == .offline ? "offline" : "\(kind) \(s.ip ?? "")"
         let mode = options.string("label", "collapsed")
-        let label: Part? = mode == "hidden" ? nil : .text(text, TextStyle(size: 11, weight: .medium, color: .secondary))
-        var c = ItemContent.iconLabel(.symbol(symbol, tone, size: 15), label, gap: host.iconGap, collapsible: mode == "collapsed")
-        c.tooltip = vpn ? "VPN \(s.vpn.joined(separator: ", ")) · \(s.vpnAddress ?? "")" : [s.interface, s.ip].compactMap { $0 }.joined(separator: " · ")
+        let label: Part? = mode == "hidden" ? nil : .text(showVPN ? "VPN" : text, TextStyle(size: 11, weight: .medium, color: .secondary))
+        var c = ItemContent.iconLabel(.symbol(showVPN ? "lock.shield.fill" : symbol, showVPN ? .token(.chart1) : tone, size: 15), label,
+                                      gap: host.iconGap, collapsible: mode == "collapsed")
+        c.tooltip = [s.interface, s.ip].compactMap { $0 }.joined(separator: " · ")
         set(c)
     }
 
@@ -219,7 +258,8 @@ final class NetworkProvider: Provider {
         }
         rows.append(PopupRow(icon: "sf:number", label: s.ip ?? "no address", detail: "IPv4", action: s.ip.map { "shell:printf %s \($0) | pbcopy" }))
         if let r = s.router { rows.append(PopupRow(icon: "sf:point.3.connected.trianglepath.dotted", label: r, detail: "router")) }
-        for v in s.vpn { rows.append(PopupRow(icon: "sf:lock.shield.fill", label: v, detail: s.vpnAddress, color: "chart1")) }
+        for v in s.vpn { rows.append(PopupRow(icon: "sf:lock.shield.fill", label: v, detail: "connected", color: "chart1")) }
+        for t in s.tunnels where s.vpn.isEmpty { rows.append(PopupRow(icon: "sf:point.3.filled.connected.trianglepath.dotted", label: t, detail: s.vpnAddress)) }
         rows.append(PopupRow(icon: "sf:gearshape", label: "Network Settings…", action: "open:x-apple.systempreferences:com.apple.Network-Settings.extension"))
         return rows
     }
@@ -233,13 +273,22 @@ final class VPNProvider: Provider {
             if s.vpn.isEmpty {
                 self.set(self.options.bool("hideWhenOff", true) ? .hidden : .iconLabel(.symbol("lock.open", .dim, size: 14), nil))
             } else {
-                var c = ItemContent.iconLabel(.symbol("lock.shield.fill", .token(.chart1), size: 14),
-                                              .text("VPN", TextStyle(size: 11, weight: .medium, color: .secondary)), gap: self.host.iconGap)
-                c.tooltip = s.vpn.joined(separator: ", ")
+                let mode = self.options.string("label", "collapsed")
+                let label: Part? = mode == "hidden" ? nil
+                    : .text(s.vpn.joined(separator: " + "), TextStyle(size: 11, weight: .medium, color: .token(.chart1)))
+                var c = ItemContent.iconLabel(.symbol("lock.shield.fill", .token(.chart1), size: 15), label, gap: self.host.iconGap,
+                                              collapsible: mode == "collapsed")
+                c.tooltip = "VPN: " + s.vpn.joined(separator: ", ")
                 self.set(c)
             }
         }
     }
 
     override func end() { NetworkMonitor.shared.remove(self) }
+
+    override func popupRows() -> [PopupRow]? {
+        let s = NetworkMonitor.shared.state
+        return s.vpn.map { PopupRow(icon: "sf:lock.shield.fill", label: $0, detail: "connected", color: "chart1") }
+            + [PopupRow(icon: "sf:gearshape", label: "VPN Settings…", action: "open:x-apple.systempreferences:com.apple.NetworkExtensionSettingsUI.NESettingsUIExtension")]
+    }
 }
