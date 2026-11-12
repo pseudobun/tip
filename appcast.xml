@@ -6,6 +6,18 @@
     <description>tip releases</description>
     <language>en</language>
     <item>
+      <title>tip 0.1.0-beta.2</title>
+      <pubDate>Thu, 12 Nov 2026 18:21:29 +0000</pubDate>
+      <sparkle:version>9</sparkle:version>
+      <sparkle:shortVersionString>0.1.0-beta.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<style>body{font:13px -apple-system,sans-serif;margin:12px 14px;color:#222}h3{font-size:13px;margin:12px 0 4px}ul{padding-left:18px;margin:4px 0}li{margin:2px 0}code{font:12px ui-monospace,monospace}a{color:#0a64d0}@media(prefers-color-scheme:dark){body{color:#ddd}a{color:#6ab0ff}}</style><h3>Bug Fixes</h3>
+<ul>
+<li><b>cask:</b> name the conflicting cask with its tap (<a href="https://github.com/pseudobun/tip/issues/4">#4</a>) (<a href="https://github.com/pseudobun/tip/commit/f5c1f978c7fbbb892511f3ac3c4a0ea1f9cf2a59">f5c1f97</a>)</li>
+</ul><p><a href="https://github.com/pseudobun/tip/releases/tag/v0.1.0-beta.2">Release on GitHub</a></p>]]></description>
+      <enclosure url="https://github.com/pseudobun/tip/releases/download/v0.1.0-beta.2/tip-0.1.0-beta.2-macos.zip" type="application/octet-stream" sparkle:edSignature="06Cyw/4HJ/ZM62zuV1oye8AYVaAf+XxlO1YS6Vy3Cw4BwwEryyjaQXkzyQilmnFyOQtDI5WAYcdgrmFi3qHQCw==" length="2426403"/>
+    </item>
+    <item>
       <title>tip 0.1.0-beta.1</title>
       <pubDate>Thu, 12 Nov 2026 17:36:26 +0000</pubDate>
       <sparkle:version>5</sparkle:version>
