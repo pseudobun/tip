@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build and test
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Test the Swift plugin SDK
+        run: swift test --package-path sdk/swift
+
+      - name: Test the Rust plugin SDK and example
+        run: |
+          (cd sdk/rust/tip-plugin && cargo test -q)
+          (cd examples/plugins/hello-rust && cargo build -q)
+
+      - name: Bundle tip.app (ad-hoc)
+        run: |
+          TIP_ARCHS="arm64" scripts/bundle.sh build.noindex
+          lipo -archs build.noindex/tip.app/Contents/MacOS/tip
+          build.noindex/tip.app/Contents/MacOS/tip version
+
+      - name: Templates match examples/
+        run: |
+          .build/debug/tip config template > /tmp/config.json5
+          diff -u examples/config.json5 /tmp/config.json5
+          .build/debug/tip theme template > /tmp/theme.json5
+          diff -u examples/theme.json5 /tmp/theme.json5
+
+      - name: Check the cask template
+        run: ruby -c packaging/tip.rb.template
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks git --redact --no-banner -v .

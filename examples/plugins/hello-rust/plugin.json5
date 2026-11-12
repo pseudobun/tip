@@ -1,0 +1,10 @@
+// An example plugin in Rust: the machine's uptime, ticking once a minute; a click shows a popup.
+{
+  id: "dev.tip.uptime",
+  name: "Uptime (Rust example)",
+  version: "0.1.0",
+  tip: "0.1.0-beta",
+  entry: "bin/tip-uptime",
+  items: [{ id: "uptime" }],
+  events: ["system_woke"],
+}

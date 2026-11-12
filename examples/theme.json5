@@ -1,0 +1,41 @@
+// A tip theme (JSON5: comments and trailing commas are fine).
+// Keep it in ~/.config/tip/themes/: the file name is the theme's id, so `theme: "nord"` in
+// config.json5 picks nord.json5. Saved changes apply at once.
+{
+  name: "My Theme",
+  description: "Based on OG.",
+  // Every key left out comes from this built-in theme:
+  // "og", "og-light", "modern", "minimal", "solarpunk" or "cyberpunk"
+  base: "og",
+  light: false,
+  // "#rgb", "#rrggbb" or "#rrggbbaa"
+  colors: {
+    background: "#1d1d16f0", // popups
+    card: "#1d1d16eb", // island fill
+    muted: "#2b2b22", // selected workspace, hover
+    foreground: "#fbfbf9", // text
+    mutedForeground: "#abab9c", // secondary text
+    border: "#ffffff1a", // island border
+    ring: "#5f5f52", // dim text, empty workspaces
+    primary: "#ead186", // accent: clock, focused workspace
+    good: "#43d58f", // healthy, charging, market up
+    warn: "#fcb52c", // needs attention
+    info: "#55b8f8", // in progress
+    destructive: "#ff6467", // failed, low battery, market down
+    chart1: "#8698eb", // graphs, VPN, ETH
+    chart2: "#ac79ff", // gas
+    chart3: "#ead186", // BTC
+    chart4: "#43d58f", // 
+    chart5: "#ff6467", // 
+  },
+  // An installed font family ("JetBrains Mono"), "system" or "system-mono". Font files
+  // (.ttf, .otf) anywhere in the themes folder are loaded too.
+  font: "Geist Mono",
+  fontSize: 12,
+  // Islands
+  radius: 9,
+  borderWidth: 1,
+  shadow: false,
+  shadowOpacity: 0.35,
+  shadowRadius: 6,
+}

@@ -1,0 +1,10 @@
+// No SDK needed: a POSIX shell script that speaks tip's protocol. Click to count, right click resets.
+{
+  id: "dev.tip.shell-counter",
+  name: "Counter (shell example)",
+  version: "0.1.0",
+  tip: "0.1.0-beta",
+  entry: "bin/counter",
+  items: [{ id: "count" }],
+  lifecycle: "on-demand",
+}

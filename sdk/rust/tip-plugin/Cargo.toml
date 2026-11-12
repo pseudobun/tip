@@ -1,0 +1,11 @@
+[package]
+name = "tip-plugin"
+version = "0.1.0"
+edition = "2021"
+description = "Write tip menu bar plugins in Rust: JSON-RPC over stdio, serde only."
+license = "MIT"
+repository = "https://github.com/pseudobun/tip"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

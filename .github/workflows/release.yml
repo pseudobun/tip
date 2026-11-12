@@ -1,0 +1,167 @@
+name: Release
+
+# Builds, signs, notarizes and publishes one version: the GitHub release's zip, the Sparkle
+# appcast (branch `appcast`; betas in its `beta` channel) and the Homebrew cask (`tip`, or
+# `tip@beta` for a beta). release-please calls it after a release PR
+# merges; run it by hand to (re)build a tag.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build, e.g. v0.2.0 or v0.3.0-beta.1 (created on the run's branch if missing)"
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      TAG: ${{ inputs.tag }}
+      SIGN_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID_APP_CERT }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Check out the tag
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then git checkout -q "$TAG"; fi
+          git log --oneline -1
+
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Resolve version
+        run: |
+          VERSION="${TAG#v}"
+          FILE_VERSION="$(tr -d '[:space:]' < VERSION)"
+          if [ "$VERSION" != "$FILE_VERSION" ]; then
+            echo "::error::$TAG does not match VERSION ($FILE_VERSION)"; exit 1
+          fi
+          case "$VERSION" in *-*) PRERELEASE=true ;; *) PRERELEASE=false ;; esac
+          {
+            echo "VERSION=$VERSION"
+            echo "PRERELEASE=$PRERELEASE"
+            echo "BUILD=$(git rev-list --count HEAD)"
+            echo "ZIP=build.noindex/release/tip-$VERSION-macos.zip"
+          } >> "$GITHUB_ENV"
+
+      - name: Test
+        run: swift test
+
+      - name: Import Developer ID certificate
+        uses: apple-actions/import-codesign-certs@fe74d46e82474f87e1ba79832ad28a4013d0e33a # v6.1.0
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_CERT_PASSWORD }}
+
+      - name: Build and sign tip.app
+        run: |
+          TIP_VERSION="$VERSION" TIP_BUILD="$BUILD" TIP_SIGN_IDENTITY="$SIGN_IDENTITY" \
+            TIP_TIMESTAMP=1 TIP_ARCHS="arm64" scripts/bundle.sh build.noindex/release
+          codesign --verify --deep --strict --verbose=2 build.noindex/release/tip.app
+          codesign -dv build.noindex/release/tip.app 2>&1 | grep -E "Authority|flags|Identifier"
+
+      - name: Notarize and staple
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          KEY="$RUNNER_TEMP/notary.p8"
+          echo "$ASC_PRIVATE_KEY" | base64 --decode > "$KEY"
+          APP=build.noindex/release/tip.app
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --key "$KEY" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" \
+            --wait --timeout 40m --output-format json | tee "$RUNNER_TEMP/notary.json"
+          STATUS="$(plutil -extract status raw "$RUNNER_TEMP/notary.json" 2>/dev/null || echo unknown)"
+          if [ "$STATUS" != "Accepted" ]; then
+            ID="$(plutil -extract id raw "$RUNNER_TEMP/notary.json" 2>/dev/null || true)"
+            [ -n "$ID" ] && xcrun notarytool log "$ID" --key "$KEY" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" || true
+            echo "::error::notarization: $STATUS"; exit 1
+          fi
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+          spctl --assess --type execute --verbose "$APP"
+
+      - name: Package and sign the update
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build.noindex/release/tip.app "$ZIP"
+          SHA256="$(shasum -a 256 "$ZIP" | awk '{print $1}')"
+          echo "SHA256=$SHA256" >> "$GITHUB_ENV"
+          printf '%s  %s\n' "$SHA256" "$(basename "$ZIP")" > "$ZIP.sha256"
+          KEY="$RUNNER_TEMP/sparkle.key"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY"
+          SIG="$(.build/artifacts/sparkle/Sparkle/bin/sign_update --ed-key-file "$KEY" "$ZIP")"
+          rm -f "$KEY"
+          echo "SPARKLE_SIG=$SIG" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub release
+        run: |
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            git tag "$TAG" && git push origin "$TAG"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP" "$ZIP.sha256" --clobber
+          else
+            scripts/release-notes.sh "$VERSION" > "$RUNNER_TEMP/notes.md"
+            flags=(); [ "$PRERELEASE" = true ] && flags+=(--prerelease)
+            gh release create "$TAG" "$ZIP" "$ZIP.sha256" --title "tip $VERSION" \
+              --notes-file "$RUNNER_TEMP/notes.md" --verify-tag "${flags[@]}"
+          fi
+          gh release edit "$TAG" --title "tip $VERSION" $([ "$PRERELEASE" = true ] && echo --prerelease)
+
+      - name: Update the appcast
+        run: |
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/$(basename "$ZIP")"
+          DIR="$RUNNER_TEMP/appcast"
+          if git ls-remote --exit-code --heads origin appcast >/dev/null; then
+            git fetch -q origin appcast
+            git worktree add -B appcast "$DIR" origin/appcast
+          else
+            git worktree add --orphan -b appcast "$DIR"
+          fi
+          scripts/release-notes.sh "$VERSION" > "$RUNNER_TEMP/appcast-notes.md"
+          scripts/appcast.sh "$DIR/appcast.xml" "$VERSION" "$BUILD" "$URL" "$SPARKLE_SIG" "$RUNNER_TEMP/appcast-notes.md"
+          xmllint --noout "$DIR/appcast.xml"
+          cd "$DIR"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git diff --cached --quiet || git commit -m "chore: publish tip $VERSION"
+          git push origin appcast
+
+      - name: Update the Homebrew tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          TAP="$RUNNER_TEMP/homebrew-tap"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/pseudobun/homebrew-tap.git" "$TAP"
+          mkdir -p "$TAP/Casks"
+          if [ "$PRERELEASE" = true ]; then CASK=tip@beta OTHER=tip; else CASK=tip OTHER=tip@beta; fi
+          sed -e "s/@CASK@/$CASK/" -e "s/@OTHER@/$OTHER/" -e "s/@VERSION@/$VERSION/" -e "s/@SHA256@/$SHA256/" \
+            packaging/tip.rb.template > "$TAP/Casks/$CASK.rb"
+          cd "$TAP"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "Casks/$CASK.rb"
+          git diff --cached --quiet || git commit -m "$CASK $VERSION"
+          git push

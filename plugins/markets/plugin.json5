@@ -1,0 +1,28 @@
+// Markets: BTC and ETH from Binance (price + 24 h change), the ETH base fee from Etherscan and
+// a countdown to the NYSE open or close. tip's first process plugin; bundled with tip.app.
+{
+  id: "com.pseudobun.tip.markets",
+  name: "Markets",
+  version: "0.1.0",
+  summary: "BTC, ETH, gas and the NYSE bell.",
+  author: "pseudobun",
+  tip: "0.1.0-beta",
+  entry: "bin/markets",
+  items: [
+    { id: "btc" },
+    { id: "eth" },
+    { id: "gas" },
+    { id: "nyse" },
+  ],
+  preferences: [
+    { id: "interval", title: "Refresh every (seconds)", type: "number", default: 60 },
+    { id: "etherscanKey", title: "Etherscan API key", type: "secret",
+      help: "For the gas price; or set it in config: \"${ETH_API_KEY}\" from ~/.config/tip/.env" },
+    { id: "nyse", title: "NYSE countdown", type: "toggle", default: true },
+    { id: "chartURL", title: "Chart URL ({symbol} = BTCUSDT…)", type: "text",
+      default: "https://www.tradingview.com/chart/?symbol=BINANCE:{symbol}" },
+  ],
+  events: ["system_woke", "network_change"],
+  permissions: ["network: api.binance.com, api.etherscan.io"],
+  lifecycle: "persistent",
+}

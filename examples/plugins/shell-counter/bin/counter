@@ -1,0 +1,16 @@
+#!/bin/sh
+# A tip plugin in 20 lines: read JSON-RPC lines on stdin, write them on stdout.
+n=0
+set_count() {
+  printf '{"jsonrpc":"2.0","method":"set","params":{"items":[{"id":"count","icon":"sf:plus.circle","label":"%s"}]}}\n' "$n"
+}
+while IFS= read -r line; do
+  case "$line" in
+    *'"method":"initialize"'*)
+      id=$(printf '%s' "$line" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+      printf '{"jsonrpc":"2.0","id":%s,"result":{"items":[{"id":"count","icon":"sf:plus.circle","label":"0","tooltip":"click: +1, right click: reset"}]}}\n' "$id" ;;
+    *'"trigger":"rightClick"'*) n=0; set_count ;;
+    *'"method":"action"'*) n=$((n + 1)); set_count ;;
+    *'"method":"shutdown"'*) exit 0 ;;
+  esac
+done

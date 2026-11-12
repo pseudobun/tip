@@ -1,0 +1,3 @@
+# Secret scan (CI runs gitleaks over the whole history).
+[extend]
+useDefault = true
