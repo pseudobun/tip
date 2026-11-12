@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>tip</title>
+    <link>https://github.com/pseudobun/tip</link>
+    <description>tip releases</description>
+    <language>en</language>
+    <item>
+      <title>tip 0.1.0-beta.1</title>
+      <pubDate>Thu, 12 Nov 2026 17:36:26 +0000</pubDate>
+      <sparkle:version>5</sparkle:version>
+      <sparkle:shortVersionString>0.1.0-beta.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<style>body{font:13px -apple-system,sans-serif;margin:12px 14px;color:#222}h3{font-size:13px;margin:12px 0 4px}ul{padding-left:18px;margin:4px 0}li{margin:2px 0}code{font:12px ui-monospace,monospace}a{color:#0a64d0}@media(prefers-color-scheme:dark){body{color:#ddd}a{color:#6ab0ff}}</style><h3>Features</h3>
+<ul>
+<li>add tip, a native menu bar with islands, themes and plugins (<a href="https://github.com/pseudobun/tip/commit/03a4df680ab32be65b5aad58d61ea48f20cdbff0">03a4df6</a>)</li>
+<li><b>animation:</b> add animation.contentMs for an item's own content changes, 80 ms by default (<a href="https://github.com/pseudobun/tip/commit/82f9e553f4b3d5e8cc4b9e026bcf9c846f0e7686">82f9e55</a>)</li>
+<li><b>island:</b> add island.bare so an item floats without a card, the Apple logo by default (<a href="https://github.com/pseudobun/tip/commit/82f9e553f4b3d5e8cc4b9e026bcf9c846f0e7686">82f9e55</a>)</li>
+<li><b>markets:</b> use the Nerd Font glyphs for BTC, ETH, gas and NYSE when a Nerd Font is installed (<a href="https://github.com/pseudobun/tip/commit/82f9e553f4b3d5e8cc4b9e026bcf9c846f0e7686">82f9e55</a>)</li>
+<li><b>network:</b> split the VPN into its own item and label the link kind (<a href="https://github.com/pseudobun/tip/commit/7215e7b01e62adeb5119ae9762c71f85dff6c915">7215e7b</a>)</li>
+<li><b>render:</b> draw private-use glyphs with an installed Nerd Font (<a href="https://github.com/pseudobun/tip/commit/82f9e553f4b3d5e8cc4b9e026bcf9c846f0e7686">82f9e55</a>)</li>
+<li><b>workspaces:</b> glide the visible workspace highlight to its new place (<a href="https://github.com/pseudobun/tip/commit/82f9e553f4b3d5e8cc4b9e026bcf9c846f0e7686">82f9e55</a>)</li>
+</ul>
+<h3>Performance</h3>
+<ul>
+<li><b>cpu:</b> read every process every 10 s and only the busiest 16 in between (<a href="https://github.com/pseudobun/tip/commit/82f9e553f4b3d5e8cc4b9e026bcf9c846f0e7686">82f9e55</a>)</li>
+<li><b>paw:</b> draw a workspace focus change at once instead of waiting on a query round trip (<a href="https://github.com/pseudobun/tip/commit/82f9e553f4b3d5e8cc4b9e026bcf9c846f0e7686">82f9e55</a>)</li>
+<li><b>render:</b> bound the render cache by 2 MB of bitmaps instead of 512 entries (<a href="https://github.com/pseudobun/tip/commit/82f9e553f4b3d5e8cc4b9e026bcf9c846f0e7686">82f9e55</a>)</li>
+<li><b>render:</b> draw bitmaps in BGRA and pre-rasterize app icons and symbols at device size (<a href="https://github.com/pseudobun/tip/commit/82f9e553f4b3d5e8cc4b9e026bcf9c846f0e7686">82f9e55</a>)</li>
+</ul><p><a href="https://github.com/pseudobun/tip/releases/tag/v0.1.0-beta.1">Release on GitHub</a></p>]]></description>
+      <enclosure url="https://github.com/pseudobun/tip/releases/download/v0.1.0-beta.1/tip-0.1.0-beta.1-macos.zip" type="application/octet-stream" sparkle:edSignature="oCaoVt9bg/tHcEHIWxZJGy6ee5XIWJjazmbKTtKfPdJj7pBP5lcGxUUr8u5lQd/U0tLxQcx7CqTluPxe2kKfDw==" length="2426431"/>
+    </item>
+  </channel>
+</rss>
