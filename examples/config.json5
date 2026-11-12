@@ -24,9 +24,11 @@
     spacing: 10,                      // between items in an island
     iconGap: 5,                       // icon → label
     material: "solid",                // solid | glass
+    bare: ["apple"],                  // item ids whose island has no card: they float on the bar
   },
 
-  animation: { enabled: true, durationMs: 220, easing: "easeOutCubic" }, // linear | easeOutCubic | easeOutQuint | easeInOut | spring
+  // durationMs: layout changes (zen, config, displays); contentMs: an item's own content changing
+  animation: { enabled: true, durationMs: 220, contentMs: 80, easing: "easeOutCubic" }, // linear | easeOutCubic | easeOutQuint | easeInOut | spring
 
   // Islands per zone: each inner list is one rounded island of item ids.
   // "default" applies to every display; "builtin" (the notched laptop display),
