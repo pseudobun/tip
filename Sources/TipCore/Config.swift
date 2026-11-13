@@ -8,6 +8,11 @@ public struct TipConfig: Codable, Equatable, Sendable {
     /// Liquid Glass (macOS 26) under islands and popups, tinted with the theme's colours. false
     /// keeps the theme's solid cards.
     public var glass = true
+    /// The glass material: "regular" (frosted, like Spotlight) or "clear" (barely frosted).
+    public var glassStyle = "regular"
+    /// How much of the theme's colour tints the glass, 0…1. Low: the wallpaper shows through as
+    /// in Spotlight; 1: close to the theme's solid cards.
+    public var glassTint = 0.2
     public var bar = Bar()
     public var island = Island()
     public var animation = Animation()
@@ -222,13 +227,15 @@ struct Fields<K: CodingKey> {
 
 extension TipConfig {
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case theme, glass, bar, island, animation, layout, items, zen, plugins, openAtLogin, updates
+        case theme, glass, glassStyle, glassTint, bar, island, animation, layout, items, zen, plugins, openAtLogin, updates
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let f = Fields(c: c)
-        try f(.theme, &theme); try f(.glass, &glass); try f(.bar, &bar); try f(.island, &island); try f(.animation, &animation)
+        try f(.theme, &theme); try f(.glass, &glass); try f(.glassStyle, &glassStyle); try f(.glassTint, &glassTint)
+        glassTint = min(max(glassTint, 0), 1)
+        try f(.bar, &bar); try f(.island, &island); try f(.animation, &animation)
         try f(.zen, &zen); try f(.plugins, &plugins); try f(.openAtLogin, &openAtLogin); try f(.updates, &updates)
         // Layout and items merge over the defaults.
         if let l = try c.decodeIfPresent([String: Zones].self, forKey: .layout) {
@@ -438,6 +445,7 @@ public enum ConfigLoader {
         if !(20...80).contains(c.bar.height) { w.append("bar.height: \(c.bar.height) is outside 20…80") }
         if !(12...c.bar.height).contains(c.island.height) { w.append("island.height: \(c.island.height) is outside 12…bar.height") }
         if !["top", "bottom"].contains(c.bar.position) { w.append("bar.position: top or bottom") }
+        if !["regular", "clear"].contains(c.glassStyle) { w.append("glassStyle: regular or clear") }
         if !["none", "glass"].contains(c.bar.material) { w.append("bar.material: none or glass") }
         if c.island.material != nil { w.append("island.material: no longer used; `glass: true | false` switches Liquid Glass") }
         if !Easing.names.contains(c.animation.easing) { w.append("animation.easing: \(Easing.names.joined(separator: ", "))") }

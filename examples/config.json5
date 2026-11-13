@@ -7,6 +7,8 @@
   theme: "og",
   // Liquid Glass under islands and popups, tinted with the theme; false: the theme's solid cards
   glass: true,
+  glassStyle: "regular",              // regular (frosted, like Spotlight) | clear (barely frosted)
+  glassTint: 0.2,                     // 0–1: how much of the theme's colour tints the glass
 
   bar: {
     height: 40,

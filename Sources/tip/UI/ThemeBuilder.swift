@@ -46,6 +46,12 @@ extension SettingsController {
             rows.row("Spacing", "Between items in an island.", rows.number(c.island.spacing, range: 0...40) { [unowned self] v in write(["island", "spacing"], Rows.fmt(v)) }),
             rows.row("Liquid Glass", "Glass under islands and popups, tinted with the theme. Off: the theme's solid cards.",
                      rows.toggle(c.glass) { [unowned self] on in write(["glass"], ConfigEdit.literal(on)) }),
+            rows.row("Glass", "Regular is frosted like Spotlight; Clear is barely frosted and shows the most of what is behind.",
+                     rows.popup(["regular", "clear"], c.glassStyle, titles: ["Regular", "Clear"]) { [unowned self] v in
+                         write(["glassStyle"], ConfigEdit.literal(v))
+                     }),
+            rows.row("Glass tint", "How much of the theme's colour tints the glass. 0 is bare glass; 1 is close to solid cards.",
+                     rows.number(c.glassTint, range: 0...1, step: 0.05) { [unowned self] v in write(["glassTint"], Rows.fmt(v)) }),
         ])
     }
 
