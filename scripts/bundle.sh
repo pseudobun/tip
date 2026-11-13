@@ -44,7 +44,7 @@ feed="${TIP_FEED_URL:-https://raw.githubusercontent.com/pseudobun/tip/appcast/ap
 [ "$feed" = "-" ] && feed=""
 xml() { local s="$1"; s="${s//&/&amp;}"; s="${s//</&lt;}"; s="${s//>/&gt;}"; printf '%s' "$s"; }
 
-app="$out/tip.app"
+app="$out/$name.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks"
 cp "$bin_dir/tip" "$app/Contents/MacOS/tip"
