@@ -6,6 +6,18 @@
     <description>tip releases</description>
     <language>en</language>
     <item>
+      <title>tip 0.1.0-beta.3</title>
+      <pubDate>Fri, 13 Nov 2026 00:18:59 +0000</pubDate>
+      <sparkle:version>11</sparkle:version>
+      <sparkle:shortVersionString>0.1.0-beta.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<style>body{font:13px -apple-system,sans-serif;margin:12px 14px;color:#222}h3{font-size:13px;margin:12px 0 4px}ul{padding-left:18px;margin:4px 0}li{margin:2px 0}code{font:12px ui-monospace,monospace}a{color:#0a64d0}@media(prefers-color-scheme:dark){body{color:#ddd}a{color:#6ab0ff}}</style><h3>Features</h3>
+<ul>
+<li><b>ui:</b> add liquid glass design (<a href="https://github.com/pseudobun/tip/issues/6">#6</a>) (<a href="https://github.com/pseudobun/tip/commit/5a92c669f0dd91e45960396d1bcbde203cbf962d">5a92c66</a>)</li>
+</ul><p><a href="https://github.com/pseudobun/tip/releases/tag/v0.1.0-beta.3">Release on GitHub</a></p>]]></description>
+      <enclosure url="https://github.com/pseudobun/tip/releases/download/v0.1.0-beta.3/tip-0.1.0-beta.3-macos.zip" type="application/octet-stream" sparkle:edSignature="oN0vEm7i2a8e848fx2Cg3c6JqiRMgxXXRshurEdo6qcnaVazb378qawUT35Pz+19yG0HbfBFMBLwJqaY9xwwDw==" length="2436286"/>
+    </item>
+    <item>
       <title>tip 0.1.0-beta.2</title>
       <pubDate>Thu, 12 Nov 2026 18:21:29 +0000</pubDate>
       <sparkle:version>9</sparkle:version>
