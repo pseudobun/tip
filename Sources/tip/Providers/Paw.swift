@@ -28,6 +28,8 @@ final class PawClient {
     private var generation = 0
     private var retry: DispatchWorkItem?
     private var dirWatch: DispatchSourceFileSystemObject?
+    /// The subscribe connection: shut down on disconnect, which ends its thread.
+    private var stream: IPC.StreamHandle?
 
     static var dir: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -60,6 +62,8 @@ final class PawClient {
 
     private func disconnect() {
         generation += 1
+        stream?.cancel()
+        stream = nil
         retry?.cancel()
         dirWatch?.cancel()
         dirWatch = nil
@@ -74,12 +78,15 @@ final class PawClient {
             waitForPaw()
             return
         }
+        stream?.cancel()
+        let handle = IPC.StreamHandle()
+        stream = handle
         Thread.detachNewThread { [weak self] in
             var got = false
             var last: [Workspace] = []
             var focused: String?
             _ = IPC.stream("subscribe snapshot,workspaceChanged,windowsChanged,windowFocused,zoomChanged,displaysChanged,setupChanged",
-                           socketPath: path) { line in
+                           socketPath: path, handle: handle) { line in
                 got = true
                 guard let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { return }
                 let data = obj["data"] as? [String: Any]
