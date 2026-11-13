@@ -53,6 +53,7 @@ final class PopupController {
         if style.glass {
             let g = NSGlassEffectView()
             g.cornerRadius = radius
+            g.style = style.glassStyle
             g.tintColor = style.glassTint(style.palette.background)
             g.appearance = style.appearance
             let veil = NSView()

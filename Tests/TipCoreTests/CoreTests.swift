@@ -71,6 +71,17 @@ import Testing
         #expect(w.contains { $0.contains("no item “clokc”") })
     }
 
+    @Test func glassStyleAndTint() throws {
+        #expect(TipConfig().glassStyle == "regular" && TipConfig().glassTint == 0.2)
+        let data = Data(#"{ glassStyle: "clear", glassTint: 1.5 }"#.utf8)
+        #expect(ConfigLoader.unknownKeys(data).isEmpty)
+        let c = try ConfigLoader.decode(data)
+        #expect(c.glassStyle == "clear" && c.glassTint == 1, "clamped to 0…1")
+        #expect(ConfigLoader.warnings(c).isEmpty)
+        let bad = try ConfigLoader.decode(Data(#"{ glassStyle: "frosted" }"#.utf8))
+        #expect(ConfigLoader.warnings(bad).contains { $0.hasPrefix("glassStyle:") })
+    }
+
     @Test func glassIsOnByDefault() throws {
         #expect(TipConfig().glass)
         #expect(try ConfigLoader.decode(Data("{ glass: false }".utf8)).glass == false)

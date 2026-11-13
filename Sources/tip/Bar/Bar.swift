@@ -319,6 +319,7 @@ final class Bar {
         }
         let radius = min(style.radius, style.islandHeight / 2)
         if g.cornerRadius != radius { g.cornerRadius = radius }
+        if g.style != style.glassStyle { g.style = style.glassStyle }
         let tint = style.glassTint(style.palette.card)
         if g.tintColor != tint { g.tintColor = tint }
         let appearance = style.appearance
@@ -357,6 +358,7 @@ final class Bar {
         guard let g = barGlass, let root = panel.contentView else { return }
         if g.frame != root.bounds { g.frame = root.bounds }
         g.cornerRadius = 0
+        if g.style != style.glassStyle { g.style = style.glassStyle }
         let tint = style.glassTint(style.palette.background)
         if g.tintColor != tint { g.tintColor = tint }
         if g.appearance?.name != style.appearance?.name { g.appearance = style.appearance }
