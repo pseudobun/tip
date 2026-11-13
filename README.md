@@ -92,8 +92,8 @@ macOS 26 or later, Apple silicon. [paw](https://github.com/pseudobun/paw) for wo
 
 ### Islands, not hacks
 
-An island is a first-class rounded group of items with its own padding, border and shadow (or
-Liquid Glass). No edge spacers, zero-width frames or bracket tricks. Three zones per display:
+An island is a first-class rounded group of items with its own padding, border and shadow, on
+macOS 26 Liquid Glass by default. No edge spacers, zero-width frames or bracket tricks. Three zones per display:
 left, center and right. The right zone gets space first, then left, then center; an island that
 would run into the notch or the other zone hides, so the order never shuffles. The notch is
 measured from the display (`auxiliaryTopLeftArea`), not hard-coded.
@@ -149,6 +149,19 @@ shadow. The builder edits it live (colour wells, font picker, sliders); the bar 
 Font files in the themes folder are loaded too. Token names match hop's, so palettes move between
 the three apps.
 
+
+### Liquid Glass
+
+On by default (`glass: true`): every island and popup sits on macOS 26 Liquid Glass
+(`NSGlassEffectView`, all of a bar's islands in one `NSGlassEffectContainerView`), tinted with the
+theme's card colour and veiled with it thinly so the theme's text stays legible on any wallpaper.
+The theme's radius and border carry over; glass brings its own rim and shadow. A new island swells
+out of a pill at its middle, a leaving one shrinks back into it, a resized one glides with its
+items, and a popup unfurls from the item's edge while the hover highlight glides between rows.
+All of it is Core Animation run by the window server: tip sets the end state and goes idle.
+`glass: false` (Settings → Appearance → Liquid Glass) keeps the theme's solid cards;
+`bar.material: "glass"` adds one glass strip behind the whole bar. Reduce Motion or
+`animation.enabled: false` turns the motion off, not the glass.
 ### Zen mode
 
 Click the clock (or `tip zen`, or `zen.hotkey`) to hide everything but `zen.keep`.
@@ -170,8 +183,9 @@ and column, and suggests the key you probably meant.
 ```json5
 {
   theme: "og",
+  glass: true,                             // Liquid Glass islands and popups; false: solid cards
   bar: { height: 40, margin: { left: 25, right: 34 } },
-  island: { height: 28, gap: 6, padding: 10, spacing: 10, material: "solid", bare: ["apple"] },
+  island: { height: 28, gap: 6, padding: 10, spacing: 10, bare: ["apple"] },
 
   layout: {
     default: {
