@@ -233,7 +233,10 @@ public func serve(_ plugin: TipPlugin) -> Never {
             exit(0)
         }
     }
-    dispatchMain()
+    // A run loop, not dispatchMain(): plugins schedule Timers on RunLoop.main. The port keeps
+    // it alive when a plugin has no timer; the main queue drains on it too.
+    RunLoop.main.add(NSMachPort(), forMode: .default)
+    while true { RunLoop.main.run(mode: .default, before: .distantFuture) }
 }
 
 private func handle(_ msg: Incoming, _ plugin: TipPlugin, _ tip: Tip) {

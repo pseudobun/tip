@@ -457,7 +457,8 @@ final class BarPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        level = .statusBar
+        // Under the system menu bar (layer 24): when it slides down it covers tip.
+        level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue - 1)
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         isMovable = false
         hidesOnDeactivate = false
