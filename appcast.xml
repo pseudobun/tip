@@ -6,6 +6,18 @@
     <description>tip releases</description>
     <language>en</language>
     <item>
+      <title>tip 0.1.0-beta.5</title>
+      <pubDate>Fri, 13 Nov 2026 16:43:11 +0000</pubDate>
+      <sparkle:version>16</sparkle:version>
+      <sparkle:shortVersionString>0.1.0-beta.5</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<style>body{font:13px -apple-system,sans-serif;margin:12px 14px;color:#222}h3{font-size:13px;margin:12px 0 4px}ul{padding-left:18px;margin:4px 0}li{margin:2px 0}code{font:12px ui-monospace,monospace}a{color:#0a64d0}@media(prefers-color-scheme:dark){body{color:#ddd}a{color:#6ab0ff}}</style><h3>Bug Fixes</h3>
+<ul>
+<li><b>bar:</b> keep the bar at the top of the screen under the menu bar level (<a href="https://github.com/pseudobun/tip/commit/4c822ce3fbe7080354a49591a96688d33180329e">4c822ce</a>)</li>
+</ul><p><a href="https://github.com/pseudobun/tip/releases/tag/v0.1.0-beta.5">Release on GitHub</a></p>]]></description>
+      <enclosure url="https://github.com/pseudobun/tip/releases/download/v0.1.0-beta.5/tip-0.1.0-beta.5-macos.zip" type="application/octet-stream" sparkle:edSignature="QUnccYQFvDC+C5t8Gu1iFaJHj6HVrf5L+igarEw6scfFy29TggmE+OGzCo1+q9bn+2bBRlZY/U25chYxy4NvAQ==" length="2436555"/>
+    </item>
+    <item>
       <title>tip 0.1.0-beta.4</title>
       <pubDate>Fri, 13 Nov 2026 16:16:56 +0000</pubDate>
       <sparkle:version>14</sparkle:version>
