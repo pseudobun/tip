@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-beta.5](https://github.com/pseudobun/tip/compare/v0.1.0-beta.4...v0.1.0-beta.5) (2026-11-13)
+
+
+### Bug Fixes
+
+* **bar:** keep the bar at the top of the screen under the menu bar level ([4c822ce](https://github.com/pseudobun/tip/commit/4c822ce3fbe7080354a49591a96688d33180329e))
+
 ## [0.1.0-beta.4](https://github.com/pseudobun/tip/compare/v0.1.0-beta.3...v0.1.0-beta.4) (2026-11-13)
 
 
