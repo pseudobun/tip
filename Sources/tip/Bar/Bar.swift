@@ -468,6 +468,8 @@ final class BarPanel: NSPanel {
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+    // Below the menu bar's level AppKit would push the bar under the menu bar area; keep it at the top.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
 }
 
 /// Routes clicks and scrolls to the item under the pointer; everything else falls through.
