@@ -19,13 +19,22 @@ struct BarModel {
 /// A borderless panel along one display's top (or bottom) edge. Layer-backed, no SwiftUI: an
 /// island is a CALayer with one sublayer per item, each item one cached bitmap. Clicks outside
 /// items fall through to the windows below.
+///
+/// With `glass` on, each island also gets an `NSGlassEffectView` under it, all in one
+/// `NSGlassEffectContainerView` (one batched pass in the window server). Glass views move with
+/// their island through implicit Core Animation, so nothing runs on tip's side while they animate.
 @MainActor
 final class Bar {
     let display: DisplayInfo
     let panel: BarPanel
     let view: BarView
+    /// Holds the islands' glass, under `view`.
+    private let glassHost = NSGlassEffectContainerView()
+    private let glassContent = NSView()
+    /// Glass behind the whole bar (`bar.material: "glass"`).
+    private var barGlass: NSGlassEffectView?
     private var islandLayers: [String: CALayer] = [:]
-    private var glassViews: [String: NSView] = [:]
+    private var glassViews: [String: NSGlassEffectView] = [:]
     private var itemLayers: [String: CALayer] = [:]
     /// Sliding highlights by item layer key and index, under their item.
     private var slideLayers: [String: [CALayer]] = [:]
@@ -39,7 +48,15 @@ final class Bar {
         panel = BarPanel()
         view = BarView()
         view.bar = self
-        panel.contentView = view
+        let root = BarRootView()
+        root.wantsLayer = true
+        root.bar = view
+        panel.contentView = root
+        glassHost.contentView = glassContent
+        glassHost.autoresizingMask = [.width, .height]
+        root.addSubview(glassHost)
+        view.autoresizingMask = [.width, .height]
+        root.addSubview(view)
         view.layer = CALayer()
         view.wantsLayer = true
         view.layer?.masksToBounds = false
@@ -50,6 +67,10 @@ final class Bar {
         let f = screen.frame
         let y = config.bar.position == "bottom" ? f.minY + config.bar.yOffset : f.maxY - h - config.bar.yOffset
         panel.setFrame(CGRect(x: f.minX, y: y, width: f.width, height: h), display: false)
+        let root = panel.contentView!
+        glassHost.frame = root.bounds
+        glassContent.frame = root.bounds
+        view.frame = root.bounds
         view.layer?.contentsScale = screen.backingScaleFactor
         panel.orderFrontRegardless()
     }
@@ -132,8 +153,9 @@ final class Bar {
                 let bare = mi.items.allSatisfy { item in
                     cfg.island.bare.contains(item.node) || cfg.island.bare.contains(String(item.node.prefix { $0 != "." }))
                 }
-                decorate(layer, style: style, material: bare ? "bare" : cfg.island.material)
-                syncGlass(key, frame: frame, style: style, on: !bare && cfg.island.material == "glass")
+                let glass = !bare && style.glass
+                decorate(layer, style: style, material: bare ? "bare" : glass ? "glass" : "solid")
+                syncGlass(key, frame: frame, style: style, on: glass, motion: motion ? timing(ms) : nil)
                 var ix = pad
                 for item in mi.items {
                     let ikey = key + "|" + item.node
@@ -158,10 +180,11 @@ final class Bar {
             }
         }
         for (k, l) in islandLayers where !seenIslands.contains(k) {
-            l.removeFromSuperlayer()
             islandLayers[k] = nil
-            glassViews.removeValue(forKey: k)?.removeFromSuperview()
+            let g = glassViews.removeValue(forKey: k)
+            leave(l, glass: g, motion: motion ? timing(ms) : nil)
         }
+        syncBarGlass(on: cfg.bar.material == "glass" && style.glass, style: style)
         for (k, ls) in slideLayers where !seenItems.contains(k) {
             ls.forEach { $0.removeFromSuperlayer() }
             slideLayers[k] = nil
@@ -174,6 +197,35 @@ final class Bar {
         hits = newHits
         updateErrorDot(m.store.error != nil, style: style)
         view.updateToolTips(newHits.compactMap { h in m.content(h.0, display: display.id)?.tooltip.map { (h.1, $0) } })
+    }
+
+    /// The render's motion as an NSAnimationContext needs it.
+    private func timing(_ ms: Double) -> (Double, CAMediaTimingFunction) {
+        let b = Easing.bezier(manager?.store.config.animation.easing ?? "easeOutCubic")
+        return (ms / 1000, CAMediaTimingFunction(controlPoints: Float(b.0), Float(b.1), Float(b.2), Float(b.3)))
+    }
+
+    /// An island going away: with motion it fades and its glass shrinks into it, then both go.
+    private func leave(_ l: CALayer, glass g: NSGlassEffectView?, motion: (Double, CAMediaTimingFunction)?) {
+        guard let motion else {
+            l.removeFromSuperlayer()
+            g?.removeFromSuperview()
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { l.removeFromSuperlayer() }
+        l.opacity = 0
+        CATransaction.commit()
+        guard let g else { return }
+        guard let gl = g.layer else { g.removeFromSuperview(); return }
+        Morph.run(gl, from: Self.seed(g.frame), to: g.frame, fade: .out, motion) { g.removeFromSuperview() }
+    }
+
+    /// Where a glass island grows from and shrinks into: a pill at its middle, so the glass
+    /// swells into place like a drop rather than popping in.
+    private static func seed(_ r: CGRect) -> CGRect {
+        let w = min(r.width, max(r.height, r.width * 0.6))
+        return CGRect(x: r.midX - w / 2, y: r.minY + r.height * 0.1, width: w, height: r.height * 0.8)
     }
 
     private func makeIsland() -> CALayer {
@@ -231,11 +283,13 @@ final class Bar {
             return
         }
         let glass = material == "glass"
-        l.backgroundColor = glass ? style.palette.card.alpha(min(style.palette.card.a, 0.25)).cg : style.palette.card.cg
-        l.borderColor = style.palette.border.cg
+        // Glass brings its own fill, rim and shadow; the theme's border stays (a neon edge is
+        // part of cyberpunk) but at half strength so it sits on the glass's own rim.
+        l.backgroundColor = glass ? style.glassVeil(style.palette.card) : style.palette.card.cg
+        l.borderColor = glass ? style.palette.border.alpha(style.palette.border.a * 0.5).cg : style.palette.border.cg
         l.borderWidth = style.theme.borderWidth
         l.cornerRadius = min(style.radius, style.islandHeight / 2)
-        if style.theme.shadow {
+        if style.theme.shadow, !glass {
             l.shadowColor = CGColor(gray: 0, alpha: 1)
             l.shadowOpacity = Float(style.theme.shadowOpacity)
             l.shadowRadius = style.theme.shadowRadius
@@ -245,21 +299,82 @@ final class Bar {
         }
     }
 
-    /// Liquid Glass behind an island (`island.material: "glass"`).
-    private func syncGlass(_ key: String, frame: CGRect, style: Style, on: Bool) {
+    /// Liquid Glass under an island (`glass: true`). A new one swells from a pill at the island's
+    /// middle; a moved or resized one glides with its island. Both are Core Animation on the
+    /// glass view's layer: the window server runs them, tip only sets the end state.
+    private func syncGlass(_ key: String, frame: CGRect, style: Style, on: Bool, motion: (Double, CAMediaTimingFunction)?) {
         guard on else {
             glassViews.removeValue(forKey: key)?.removeFromSuperview()
             return
         }
-        let v: NSView
-        if let existing = glassViews[key] { v = existing } else {
-            let g = NSGlassEffectView()
-            g.cornerRadius = min(style.radius, style.islandHeight / 2)
-            view.addSubview(g, positioned: .below, relativeTo: nil)
+        let g: NSGlassEffectView
+        var fresh = false
+        if let existing = glassViews[key] { g = existing } else {
+            g = NSGlassEffectView()
+            glassContent.addSubview(g)
             glassViews[key] = g
-            v = g
+            fresh = true
         }
-        v.frame = frame
+        let radius = min(style.radius, style.islandHeight / 2)
+        if g.cornerRadius != radius { g.cornerRadius = radius }
+        let tint = style.glassTint(style.palette.card)
+        if g.tintColor != tint { g.tintColor = tint }
+        let appearance = style.appearance
+        if g.appearance?.name != appearance?.name { g.appearance = appearance }
+        if fresh {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            g.frame = frame
+            CATransaction.commit()
+            if let motion, let l = g.layer { Morph.run(l, from: Self.seed(frame), to: frame, fade: .in, motion) }
+            return
+        }
+        let old = g.frame
+        guard old != frame else { return }
+        // The view jumps to its new frame and its layer glides there from the old one (a
+        // transform animation). Animating the view's frame instead would have AppKit step it,
+        // with a layout pass, on the main thread every display frame.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        g.frame = frame
+        CATransaction.commit()
+        if let motion, let l = g.layer { Morph.run(l, from: old, to: frame, fade: nil, motion) }
+    }
+
+
+    /// One glass strip behind the whole bar (`bar.material: "glass"`), outside the container so
+    /// it does not merge with the islands' glass.
+    private func syncBarGlass(on: Bool, style: Style) {
+        guard on else { barGlass?.removeFromSuperview(); barGlass = nil; return }
+        if barGlass == nil {
+            let g = NSGlassEffectView()
+            g.autoresizingMask = [.width, .height]
+            panel.contentView?.addSubview(g, positioned: .below, relativeTo: glassHost)
+            barGlass = g
+        }
+        guard let g = barGlass, let root = panel.contentView else { return }
+        if g.frame != root.bounds { g.frame = root.bounds }
+        g.cornerRadius = 0
+        let tint = style.glassTint(style.palette.background)
+        if g.tintColor != tint { g.tintColor = tint }
+        if g.appearance?.name != style.appearance?.name { g.appearance = style.appearance }
+    }
+
+    /// For `tip preview`: glass is drawn by the window server, so a layer snapshot cannot see
+    /// it. Islands get their glass tint as a plain fill while `body` renders.
+    func withGlassAsFill(_ body: () -> Void) {
+        let glassy = islandLayers.filter { glassViews[$0.key] != nil }
+        let tint = manager.map { $0.style.palette.card.alpha($0.style.palette.card.a * 0.8).cg }
+        let veil = manager.map { $0.style.glassVeil($0.style.palette.card) }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (_, l) in glassy { l.backgroundColor = tint }
+        CATransaction.commit()
+        body()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (_, l) in glassy { l.backgroundColor = veil }
+        CATransaction.commit()
     }
 
     /// A small red dot at the bar's left edge while the config file is broken.
@@ -288,6 +403,52 @@ final class Bar {
     }
 
     func rect(of node: String) -> CGRect? { hits.first { $0.node == node }?.rect }
+}
+
+/// Render-server animations for views whose layers AppKit owns (glass, the popup card): the
+/// view sits at its final frame and its layer is transformed from where it was (or swells from
+/// a seed), so no frame is stepped on the main thread.
+enum Morph {
+    enum Fade { case `in`, out }
+
+    static func run(_ l: CALayer, from: CGRect, to frame: CGRect, fade: Fade?, _ motion: (Double, CAMediaTimingFunction),
+                    done: (() -> Void)? = nil) {
+        guard frame.width > 0, frame.height > 0 else { done?(); return }
+        // Layer-backed views anchor at their origin: scale, then shift onto `from`.
+        var t = CATransform3DMakeTranslation(from.minX - frame.minX, from.minY - frame.minY, 0)
+        t = CATransform3DScale(t, from.width / frame.width, from.height / frame.height, 1)
+        let moved = NSValue(caTransform3D: t), home = NSValue(caTransform3D: CATransform3DIdentity)
+        let out = fade == .out
+        let shape = CABasicAnimation(keyPath: "transform")
+        shape.fromValue = out ? home : moved
+        shape.toValue = out ? moved : home
+        var parts: [CAAnimation] = [shape]
+        if let fade {
+            let o = CABasicAnimation(keyPath: "opacity")
+            o.fromValue = fade == .in ? 0 : 1
+            o.toValue = fade == .in ? 1 : 0
+            parts.append(o)
+        }
+        let group = CAAnimationGroup()
+        group.animations = parts
+        group.duration = motion.0
+        group.timingFunction = motion.1
+        if out {
+            group.fillMode = .forwards
+            group.isRemovedOnCompletion = false
+        }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock(done)
+        l.add(group, forKey: "tip.morph")
+        CATransaction.commit()
+    }
+}
+
+/// The panel's content: the glass container under the bar view. Hit testing goes to the bar view
+/// only, so glass never takes a click.
+final class BarRootView: NSView {
+    weak var bar: BarView?
+    override func hitTest(_ point: NSPoint) -> NSView? { bar?.hitTest(convert(point, from: superview)) }
 }
 
 final class BarPanel: NSPanel {

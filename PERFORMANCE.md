@@ -26,6 +26,11 @@ tip sits on screen all day. It must cost nothing while nothing changes.
 - **Event payloads only for subscribers.** `itemChanged` is encoded only when someone runs
   `tip subscribe`; encoding happens off the main thread.
 - **Graphs are a ring buffer and one path.** No per-point layers.
+- **Animations belong to the render server.** Island and slide layers use implicit CALayer
+  actions; glass views and the popup card move by `transform`/`opacity` layer animations while the
+  view jumps to its end frame. Never animate an `NSView` frame (`animator()` or
+  `allowsImplicitAnimation`): AppKit steps those on the main thread every display frame, with a
+  layout pass each time (measured: 1 % CPU, 100 wakeups / 10 s while one ran).
 - **Plugins are budgeted.** 30 `set`/s (the rest coalesced), 64 KB per message, 15 s per request,
   restarts after 1, 5, 30 s, then off.
 
@@ -58,6 +63,23 @@ VPN and media hide themselves on a Mac mini with no VPN up and nothing playing).
 | `tip query` (every item) | 9.4 ms p50, 10.3 ms p90 |
 
 Nearly all the idle CPU is the CPU item's 2 s sampler; zen mode shows what is left.
+
+## Liquid Glass (`glass: true`)
+
+Measured on 2026-11-13 on olympus (same machine, display locked, default config of a fresh
+`~/.config/tip-dev`), dev builds of beta before and after glass, each launched fresh and sampled
+with `tip bench 60` after 10 s:
+
+| | before (solid) | `glass: false` | `glass: true` |
+|---|---|---|---|
+| Idle CPU | 0.13–0.16 % | 0.13–0.17 % | 0.13–0.19 % |
+| Wakeups | 5.2–6.2 per 10 s | 5.2–5.5 per 10 s | 5.5–5.8 per 10 s |
+| Footprint | 20.1–20.2 MB | 21.0–21.5 MB | 23.4 MB |
+
+Glass costs nothing at rest in tip: the glass is composited by the window server, and an idle
+render (clock, cpu) leaves the glass views untouched. Its price is ~3 MB of footprint for the glass
+views' layers, inside the 25 MB budget. Twelve island resizes in 3 s sampled with `sample` show no
+main-thread animation stepping (`NSAnimationManager`: 0 frames).
 
 ## Known costs
 

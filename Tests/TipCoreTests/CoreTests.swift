@@ -53,6 +53,17 @@ import Testing
         #expect(w.contains { $0.contains("no item “clokc”") })
     }
 
+    @Test func glassIsOnByDefault() throws {
+        #expect(TipConfig().glass)
+        #expect(try ConfigLoader.decode(Data("{ glass: false }".utf8)).glass == false)
+        // The old per-island switch still loads, is ignored, and says what replaced it.
+        let data = Data(#"{ island: { material: "solid" } }"#.utf8)
+        #expect(ConfigLoader.unknownKeys(data).isEmpty)
+        let c = try ConfigLoader.decode(data)
+        #expect(c.glass)
+        #expect(ConfigLoader.warnings(c).contains { $0.hasPrefix("island.material:") })
+    }
+
     @Test func badSyntaxHasALine() {
         #expect(throws: ConfigProblem.self) { try ConfigLoader.decode(Data("{\n  bar: { height: }\n}".utf8)) }
     }

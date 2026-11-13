@@ -8,10 +8,23 @@ struct Style: Equatable {
     var theme: BarTheme
     var island: TipConfig.Island
     var barHeight: CGFloat
+    /// Liquid Glass under islands and popups (`glass`).
+    var glass = true
 
     var palette: Palette { theme.palette }
     var radius: CGFloat { CGFloat(island.radius ?? theme.radius) }
     var islandHeight: CGFloat { CGFloat(island.height) }
+
+    /// What glass is tinted toward: the theme's fill. Liquid Glass only leans toward its tint, so
+    /// on a bright desktop it stays light; `glassVeil` keeps the theme's text legible on it.
+    func glassTint(_ fill: ARGB) -> NSColor { fill.ns }
+
+    /// The theme's fill laid thinly over the glass: enough to carry the theme's colour and keep
+    /// its text readable on any wallpaper, thin enough that the glass still shows.
+    func glassVeil(_ fill: ARGB) -> CGColor { fill.alpha(fill.a * (theme.light ? 0.4 : 0.5)).cg }
+
+    /// The glass matches the theme, not the system: dark glass under a dark theme's light text.
+    var appearance: NSAppearance? { NSAppearance(named: theme.light ? .aqua : .darkAqua) }
 
     func color(_ p: Paint) -> NSColor { p.resolve(palette).ns }
     func cg(_ p: Paint) -> CGColor { p.resolve(palette).cg }

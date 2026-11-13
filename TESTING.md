@@ -25,4 +25,7 @@ These need a person and real hardware; run them before a release.
 - [ ] **Plugins**: install the shell example, click it, right click it, `tip plugins disable`,
       kill its process (restarts with backoff).
 - [ ] **Popups**: every item's popup opens under it, closes on a click elsewhere and on leaving it.
+- [ ] **Liquid Glass**: with `glass: true` islands and popups are glass over a busy wallpaper and
+      their text reads in every theme; zen in and out: islands swell and shrink; hover a popup's
+      rows: the highlight glides. `tip config set glass false`: solid cards at once, and back.
 - [ ] **Budget**: `just bench` matches PERFORMANCE.md.
