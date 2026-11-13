@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-beta.3](https://github.com/pseudobun/tip/compare/v0.1.0-beta.2...v0.1.0-beta.3) (2026-11-13)
+
+
+### Features
+
+* **ui:** add liquid glass design ([#6](https://github.com/pseudobun/tip/issues/6)) ([5a92c66](https://github.com/pseudobun/tip/commit/5a92c669f0dd91e45960396d1bcbde203cbf962d))
+
 ## [0.1.0-beta.2](https://github.com/pseudobun/tip/compare/v0.1.0-beta.1...v0.1.0-beta.2) (2026-11-12)
 
 
