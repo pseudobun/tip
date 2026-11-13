@@ -40,27 +40,68 @@ final class ConfigStore {
     func start() {
         if !FileManager.default.fileExists(atPath: url.path) { writeTemplate() }
         load(notify: false)
-        watchers = [FileWatcher(url: url) { [weak self] in self?.load() },
-                    FileWatcher(url: envURL) { [weak self] in self?.load() }]
-        for other in [Self.pawConfig, Self.hopConfig] {
-            watchers.append(FileWatcher(url: other) { [weak self] in self?.load() })
+        // One watcher for every file: the config and .env share a folder, and one save there
+        // must rebuild once, not once per watcher.
+        watchers = [FileWatcher(urls: [url, envURL, Self.pawConfig, Self.hopConfig]) { [weak self] in self?.reloadIfChanged() }]
+        themeWatcher = FolderWatcher(folder: themesFolder) { [weak self] in self?.reloadIfChanged() }
+    }
+
+    /// Everything a load reads, to tell a change tip cares about from a save of an unrelated
+    /// file in the same folder (a dotfiles repo).
+    private struct Inputs: Equatable {
+        var config: Data?
+        var env: Data?
+        var followed: [String: String]
+        var themes: [String: [Double]]
+    }
+
+    private var lastInputs: Inputs?
+    /// A blank config is read once more before it counts as broken (an editor truncating first).
+    private var blankRetry = false
+
+    private func readInputs() -> Inputs {
+        let followed = ["follow-paw": Self.theme(in: Self.pawConfig, path: ["appearance", "theme"]),
+                        "follow-hop": Self.theme(in: Self.hopConfig, path: ["general", "theme"])].compactMapValues { $0 }
+        var themes: [String: [Double]] = [:]
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
+        for file in (try? FileManager.default.contentsOfDirectory(at: themesFolder, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])) ?? [] {
+            let v = try? file.resourceValues(forKeys: keys)
+            themes[file.lastPathComponent] = [v?.contentModificationDate?.timeIntervalSince1970 ?? 0, Double(v?.fileSize ?? 0)]
         }
-        themeWatcher = FolderWatcher(folder: themesFolder) { [weak self] in self?.load() }
+        return Inputs(config: try? Data(contentsOf: url), env: try? Data(contentsOf: envURL), followed: followed, themes: themes)
+    }
+
+    /// A watcher fired: reload only when something tip reads changed.
+    private func reloadIfChanged() {
+        guard readInputs() != lastInputs else { return }
+        load()
     }
 
     func load(notify: Bool = true) {
-        env = EnvFile.parse((try? String(contentsOf: envURL, encoding: .utf8)) ?? "")
+        let inputs = readInputs()
+        lastInputs = inputs
+        env = EnvFile.parse(inputs.env.map { String(decoding: $0, as: UTF8.self) } ?? "")
         loadThemes()
-        followed = ["follow-paw": Self.theme(in: Self.pawConfig, path: ["appearance", "theme"]),
-                    "follow-hop": Self.theme(in: Self.hopConfig, path: ["general", "theme"])].compactMapValues { $0 }
-        let raw = (try? Data(contentsOf: url)) ?? Data()
+        followed = inputs.followed
+        if let raw = inputs.config, ConfigLoader.isBlank(raw), !blankRetry {
+            blankRetry = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                MainActor.assumeIsolated { self?.load(notify: notify) }
+            }
+            return
+        }
+        blankRetry = false
         do {
-            config = try ConfigLoader.decode(raw)
+            // Missing or still blank: an error, the last good config stays.
+            let raw = inputs.config ?? Data()
+            config = try ConfigLoader.load(inputs.config)
             error = nil
             warnings = ConfigLoader.unknownKeys(raw).map { "unknown key \($0)" }
                 + ConfigLoader.warnings(config, customThemes: customThemes.map(\.id)) + themeIssues
         } catch {
             self.error = "\(error)"
+            // The config's warnings were about the file that broke; keep only the themes'.
+            warnings = themeIssues
             Log.app.error("config: \(self.error ?? "", privacy: .public)")
         }
         if notify { onChange?() }
@@ -89,7 +130,7 @@ final class ConfigStore {
                 issues.append("themes/\(file.lastPathComponent): not valid JSON5")
             }
         }
-        if !fonts.isEmpty { Style.registerFonts(extra: fonts) }
+        Style.setThemeFonts(fonts)
         customThemes = themes.sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
         themeIssues = issues
     }

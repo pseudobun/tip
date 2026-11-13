@@ -196,7 +196,9 @@ final class Bar {
         CATransaction.commit()
         hits = newHits
         updateErrorDot(m.store.error != nil, style: style)
-        view.updateToolTips(newHits.compactMap { h in m.content(h.0, display: display.id)?.tooltip.map { (h.1, $0) } })
+        var tips = newHits.compactMap { h in m.content(h.0, display: display.id)?.tooltip.map { (h.1, $0) } }
+        if let e = m.store.error, let r = errorDotHitRect { tips.append((r, "Config error: \(e)\ntip keeps the last good config. Click to open Settings.")) }
+        view.updateToolTips(tips)
     }
 
     /// The render's motion as an NSAnimationContext needs it.
@@ -377,6 +379,15 @@ final class Bar {
         CATransaction.commit()
     }
 
+    /// The red dot's node for clicks: not an item, opens Settings.
+    static let errorNode = "__tip.configError"
+
+    /// Where the red dot takes the pointer: a little wider than the dot, the bar's full height.
+    private var errorDotHitRect: CGRect? {
+        guard let d = errorDot?.frame else { return nil }
+        return CGRect(x: d.minX - 6, y: 0, width: d.width + 12, height: view.bounds.height)
+    }
+
     /// A small red dot at the bar's left edge while the config file is broken.
     private func updateErrorDot(_ on: Bool, style: Style) {
         guard on else { errorDot?.removeFromSuperlayer(); errorDot = nil; return }
@@ -395,6 +406,7 @@ final class Bar {
             let tag = h.tags.first { $0.1.contains(p) }?.0
             return (h.node, tag, h.rect)
         }
+        if let r = errorDotHitRect, r.contains(p) { return (Self.errorNode, nil, r) }
         return nil
     }
 

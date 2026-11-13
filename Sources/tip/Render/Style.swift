@@ -57,10 +57,9 @@ struct Style: Equatable {
     private static var registered = false
     private static var cache: [String: NSFont] = [:]
 
-    /// The fonts in tip.app's Resources/Fonts (the themes' fonts) and in ~/.config/tip/themes/,
-    /// for this process.
-    static func registerFonts(extra: [URL] = []) {
-        var urls = extra
+    /// The fonts in tip.app's Resources/Fonts (the themes' fonts), for this process.
+    static func registerFonts() {
+        var urls: [URL] = []
         if !registered {
             registered = true
             for ext in ["ttf", "otf"] {
@@ -76,6 +75,25 @@ struct Style: Equatable {
         }
         for url in Set(urls) { CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil) }
         cache.removeAll()
+    }
+
+    /// Theme fonts registered from ~/.config/tip/themes/, with the modification date they had.
+    private static var themeFonts: [URL: Date] = [:]
+
+    /// The fonts in ~/.config/tip/themes/: a replaced file (new date) is unregistered and
+    /// registered again, a removed one unregistered, so font edits apply without a restart.
+    @MainActor static func setThemeFonts(_ urls: [URL]) {
+        var next: [URL: Date] = [:]
+        for url in urls {
+            next[url] = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+        }
+        guard next != themeFonts else { return }
+        for (url, date) in themeFonts where next[url] != date { CTFontManagerUnregisterFontsForURL(url as CFURL, .process, nil) }
+        for (url, date) in next where themeFonts[url] != date { CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil) }
+        themeFonts = next
+        cache.removeAll()
+        nerdFamily = .none
+        Renderer.clear()
     }
 
     static func font(_ family: String, size: CGFloat, weight: Weight) -> NSFont {
