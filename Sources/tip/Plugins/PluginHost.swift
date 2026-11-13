@@ -34,6 +34,8 @@ final class PluginHost {
         var lastError: String?
         var log: [String] = []
         var preferences: [String: JSONValue] = [:]
+        /// The config items that show it, as of the last sync.
+        var items: [String: ItemConfig] = [:]
         var popups: [String: [PopupRow]] = [:]
         var restart: DispatchWorkItem?
         let stamp: Date?
@@ -99,20 +101,35 @@ final class PluginHost {
         for (id, p) in found where entries[id] == nil { entries[id] = Entry(p) }
         for (id, e) in entries {
             let prefs = preferences(for: e.plugin, config: config, store: store)
+            let items = config.items.filter { $0.value.provider == "plugin" && $0.value.string("plugin") == id }
+            let oldKeys = e.items.keys.sorted()
             if config.plugins.disabled.contains(id) {
                 stop(e)
                 e.state = .disabled
+                e.items = items
                 continue
             }
             if e.state == .disabled { e.state = .stopped }
+            // A plugin that gave up gets another go once what it runs with changes (its
+            // settings fixed, its items edited).
+            if e.state == .failed, prefs != e.preferences || items != e.items {
+                e.state = .stopped
+                e.attempts = 0
+                e.lastError = nil
+            }
+            e.items = items
             guard used.contains(id) else { stop(e); continue }
             if e.process?.isRunning == true {
                 if prefs != e.preferences {
                     e.preferences = prefs
                     e.process?.notify("preferencesChanged", ["preferences": .object(prefs)])
                 }
+                // A new item key shows what the plugin last set, not blank until its next `set`.
+                let keys = items.keys.sorted()
+                if let from = oldKeys.first(where: keys.contains) ?? oldKeys.first {
+                    for key in keys where !oldKeys.contains(key) { manager?.copyPluginItems(from: from, to: key) }
+                }
             } else if e.plugin.manifest.lifecycle == "persistent", e.state != .failed, e.state != .backoff {
-                e.preferences = prefs
                 launch(e)
             }
         }
@@ -139,6 +156,8 @@ final class PluginHost {
 
     private func launch(_ e: Entry) {
         let m = e.plugin.manifest
+        // Read now: an on-demand plugin launches from visibilityChanged, long after the last sync.
+        if let manager { e.preferences = preferences(for: e.plugin, config: manager.store.config, store: manager.store) }
         let exe = e.plugin.directory.appending(path: m.entry)
         guard FileManager.default.isExecutableFile(atPath: exe.path) else {
             e.state = .failed
