@@ -35,7 +35,8 @@ final class BarManager: ProviderHost {
 
     init(store: ConfigStore) {
         self.store = store
-        style = Style(theme: store.theme(store.config.theme), island: store.config.island, barHeight: store.config.bar.height)
+        style = Style(theme: store.theme(store.config.theme), island: store.config.island, barHeight: store.config.bar.height,
+                      glass: store.config.glass)
         plugins = PluginHost()
         plugins.manager = self
         popup.onAction = { [weak self] row in self?.popupRowPicked(row) }
@@ -74,7 +75,7 @@ final class BarManager: ProviderHost {
 
     private func restyle(redraw: Bool = true) {
         let theme = previewTheme ?? store.theme(store.config.theme)
-        let next = Style(theme: theme, island: store.config.island, barHeight: store.config.bar.height)
+        let next = Style(theme: theme, island: store.config.island, barHeight: store.config.bar.height, glass: store.config.glass)
         guard next != style else { return }
         let themeChanged = next.theme != style.theme
         style = next
@@ -346,6 +347,7 @@ final class BarManager: ProviderHost {
             let rows = content(node, display: bar.display.id)?.popup.flatMap { $0.isEmpty ? nil : $0 }
                 ?? providers[id]?.popupRows() ?? plugins.popupRows(node: node) ?? []
             popupNodeMemo = node
+            popup.animation = store.config.animation
             popup.toggle(node: node, rows: rows, under: rect, bar: bar, style: style)
         case .toggleLabel:
             guard let node else { return }
@@ -466,7 +468,7 @@ extension BarManager {
             y -= h
             ctx.saveGState()
             ctx.translateBy(x: 0, y: y)
-            bar.view.layer?.render(in: ctx)
+            bar.withGlassAsFill { bar.view.layer?.render(in: ctx) }
             ctx.restoreGState()
         }
         guard let img = ctx.makeImage() else { throw ConfigProblem("render failed") }

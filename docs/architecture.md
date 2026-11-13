@@ -114,7 +114,7 @@ struct Item {            // smallest drawable unit
 struct Island {          // rounded group ("bracket") — first-class, not a hack
   let id: String
   var items: [Item.ID]
-  var style: IslandStyle // fill, border, radius, material (.solid | .glass)
+  var style: IslandStyle // fill, border, radius; Liquid Glass under it unless `glass: false`
 }
 
 struct BarLayout {       // per display
@@ -239,6 +239,7 @@ Rules:
 {
   // Look ------------------------------------------------------------------
   theme: "og",                    // og | og-light | modern | solarpunk | cyberpunk | minimal | follow-paw | follow-hop
+  glass: true,                    // Liquid Glass under islands and popups, tinted with the theme
   bar: {
     height: 40,
     position: "top",
@@ -246,7 +247,7 @@ Rules:
     material: "none",               // none | glass (Liquid Glass behind the whole bar)
     displays: "all",                // all | main | ["DELL U3223QE", ...]
   },
-  island: { height: 28, radius: 9, gap: 6, padding: 5, material: "solid" }, // solid | glass
+  island: { height: 28, radius: 9, gap: 6, padding: 5 },
   animation: { durationMs: 220, contentMs: 80, easing: "easeOutCubic" },
 
   // Layout per display kind; ids refer to items below -------------------------
@@ -314,10 +315,10 @@ Exit codes: 0 ok, 1 error / not running, 3 dry run, 10 update available, 64 usag
 ## 9. Design
 
 - **Themes:** the shared set — OG (default), OG Light, Modern, Solarpunk, Cyberpunk, Minimal — with hop's token names: `background card muted foreground mutedForeground border ring primary good warn info destructive chart1…chart5` + `wash(alpha)`. OG for tip = today's bar palette (`island #1d1d16 / 0.92`, `border white 10 %`, `fg #fbfbf9`, `muted #abab9c`, `dim #5f5f52`, gold `#ead186`, wave `#8698eb`), which already matches olympus-dashboard and paw's gold accent.
-- **Islands:** paw's CALayer island style (`UI/Style.swift`): fill, 1 px border, continuous corners, optional soft shadow; radius from theme (9 default, 2 cyberpunk, 12 modern). Optional `glass` material via `NSGlassEffectView` like hop's panels.
+- **Islands:** paw's CALayer island style (`UI/Style.swift`): fill, 1 px border, continuous corners, optional soft shadow; radius from theme (9 default, 2 cyberpunk, 12 modern). Liquid Glass by default (`glass: true`): one `NSGlassEffectView` per island inside a per-bar `NSGlassEffectContainerView`, tinted toward the theme's card colour with a thin veil of it on the island layer; the theme's border at half strength, no layer shadow (glass has its own). Popups get the same card. `glass: false` restores the solid theme cards.
 - **Type:** bundled Geist Mono (labels, numbers), Outfit (popup titles), theme fonts (DM Mono, Share Tech Mono) with OFL files, registered per process with `CTFontManagerRegisterFontsForURL`. hop's scale: label mono 11/500, meta 12, body 14. Numbers always tabular.
 - **Icons:** SF Symbols by name (`"wifi"`, `"cable.connector"`, `"lock.shield.fill"`), Nerd Font glyphs allowed, app icons from bundle id (cached at drawn size). App icons for workspaces via `NSWorkspace.icon(forFile:)` instead of a 30 KB icon-font map.
-- **Motion:** 180–220 ms, paw easings, label width expand/collapse on click (today's network label), graph scrolls without re-layout. Reduce Motion → instant.
+- **Motion:** 180–220 ms, paw easings, glass islands swell in, shrink out and glide as `transform`/`opacity` layer animations (never an animated `NSView` frame: AppKit steps those on the main thread every display frame), label width expand/collapse on click (today's network label), graph scrolls without re-layout. Reduce Motion → instant.
 - **App icon:** Icon Composer `.icon`, dark gradient like hop, glyph = a horizontal bar with three island pills. `docs/assets/{logo.svg, preview.png, social-preview.png}`.
 
 ---

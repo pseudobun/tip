@@ -44,9 +44,8 @@ extension SettingsController {
             rows.row("Gap between islands", nil, rows.number(c.island.gap, range: 0...40) { [unowned self] v in write(["island", "gap"], Rows.fmt(v)) }),
             rows.row("Padding", "Inside an island, at its ends.", rows.number(c.island.padding, range: 0...40) { [unowned self] v in write(["island", "padding"], Rows.fmt(v)) }),
             rows.row("Spacing", "Between items in an island.", rows.number(c.island.spacing, range: 0...40) { [unowned self] v in write(["island", "spacing"], Rows.fmt(v)) }),
-            rows.row("Material", "Glass: Liquid Glass behind each island.", rows.popup(["solid", "glass"], c.island.material, titles: ["Solid", "Glass"]) { [unowned self] v in
-                write(["island", "material"], ConfigEdit.literal(v))
-            }),
+            rows.row("Liquid Glass", "Glass under islands and popups, tinted with the theme. Off: the theme's solid cards.",
+                     rows.toggle(c.glass) { [unowned self] on in write(["glass"], ConfigEdit.literal(on)) }),
         ])
     }
 

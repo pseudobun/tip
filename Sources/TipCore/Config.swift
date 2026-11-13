@@ -5,6 +5,9 @@ import Foundation
 public struct TipConfig: Codable, Equatable, Sendable {
     /// og | og-light | modern | minimal | solarpunk | cyberpunk | follow-paw | follow-hop | a file in themes/.
     public var theme = "og"
+    /// Liquid Glass (macOS 26) under islands and popups, tinted with the theme's colours. false
+    /// keeps the theme's solid cards.
+    public var glass = true
     public var bar = Bar()
     public var island = Island()
     public var animation = Animation()
@@ -55,8 +58,8 @@ public struct TipConfig: Codable, Equatable, Sendable {
         public var spacing = 10.0
         /// Between an item's icon and its label.
         public var iconGap = 5.0
-        /// "solid" (theme fill) or "glass" (Liquid Glass).
-        public var material = "solid"
+        /// Replaced by the top-level `glass`; still read so older configs load, then ignored.
+        public var material: String?
         /// Item ids whose island draws no card: the items float on the bar (the Apple logo).
         public var bare = ["apple"]
         public init() {}
@@ -219,13 +222,13 @@ struct Fields<K: CodingKey> {
 
 extension TipConfig {
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case theme, bar, island, animation, layout, items, zen, plugins, openAtLogin, updates
+        case theme, glass, bar, island, animation, layout, items, zen, plugins, openAtLogin, updates
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let f = Fields(c: c)
-        try f(.theme, &theme); try f(.bar, &bar); try f(.island, &island); try f(.animation, &animation)
+        try f(.theme, &theme); try f(.glass, &glass); try f(.bar, &bar); try f(.island, &island); try f(.animation, &animation)
         try f(.zen, &zen); try f(.plugins, &plugins); try f(.openAtLogin, &openAtLogin); try f(.updates, &updates)
         // Layout and items merge over the defaults.
         if let l = try c.decodeIfPresent([String: Zones].self, forKey: .layout) {
@@ -272,7 +275,8 @@ extension TipConfig.Island {
     public init(from decoder: Decoder) throws {
         let f = Fields(c: try decoder.container(keyedBy: CodingKeys.self))
         try f(.height, &height); try f(.gap, &gap); try f(.padding, &padding); try f(.spacing, &spacing)
-        try f(.iconGap, &iconGap); try f(.material, &material); try f(.bare, &bare)
+        try f(.iconGap, &iconGap); try f(.bare, &bare)
+        material = try f.c.decodeIfPresent(String.self, forKey: .material)
         radius = try f.c.decodeIfPresent(Double.self, forKey: .radius)
     }
 }
@@ -422,7 +426,7 @@ public enum ConfigLoader {
         if !(12...c.bar.height).contains(c.island.height) { w.append("island.height: \(c.island.height) is outside 12…bar.height") }
         if !["top", "bottom"].contains(c.bar.position) { w.append("bar.position: top or bottom") }
         if !["none", "glass"].contains(c.bar.material) { w.append("bar.material: none or glass") }
-        if !["solid", "glass"].contains(c.island.material) { w.append("island.material: solid or glass") }
+        if c.island.material != nil { w.append("island.material: no longer used; `glass: true | false` switches Liquid Glass") }
         if !Easing.names.contains(c.animation.easing) { w.append("animation.easing: \(Easing.names.joined(separator: ", "))") }
         if !["auto", "stable", "beta"].contains(c.updates.channel) { w.append("updates.channel: auto, stable or beta") }
         if !c.zen.hotkey.isEmpty, KeySpec.parse(c.zen.hotkey) == nil { w.append("zen.hotkey: “\(c.zen.hotkey)” is not a key") }
