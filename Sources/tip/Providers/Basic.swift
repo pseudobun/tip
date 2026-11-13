@@ -124,6 +124,9 @@ final class ClockProvider: Provider {
 final class ScriptProvider: Provider {
     private var timer: Repeater?
     private var runningCommand = false
+    /// Bumped on stop: a command still running from before a stop/start is forgotten, so the
+    /// restarted item runs at once instead of waiting for it.
+    private var generation = 0
 
     override func begin() {
         let interval = options.double("interval", 60)
@@ -133,6 +136,8 @@ final class ScriptProvider: Provider {
     override func end() {
         timer?.invalidate()
         timer = nil
+        generation += 1
+        runningCommand = false
     }
 
     override func event(_ name: String, _ data: [String: Any]) {
@@ -142,10 +147,12 @@ final class ScriptProvider: Provider {
     private func run() {
         guard !runningCommand, let host = host as? BarManager, let command = options.string("command") else { return }
         runningCommand = true
+        let gen = generation
         let cmd = host.store.env.isEmpty ? command : EnvFile.expand(command, host.store.env)
         Shell.run(cmd) { [weak self] out, _ in
-            guard let self, self.running else { return }
+            guard let self, gen == self.generation else { return }
             self.runningCommand = false
+            guard self.running else { return }
             var spec = ItemSpec(id: self.id)
             if out.hasPrefix("{"), let s = try? JSONDecoder().decode(ItemSpec.self, from: Data(("{\"id\":\"\(self.id)\"," + out.dropFirst()).utf8)) {
                 spec = s

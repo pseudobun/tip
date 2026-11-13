@@ -15,6 +15,24 @@ import Testing
         #expect(try ConfigLoader.decode(Data("{}".utf8)) == TipConfig())
     }
 
+    @Test func missingOrBlankFileIsAnError() throws {
+        // The app keeps its last good config instead of resetting to the defaults.
+        #expect(throws: ConfigProblem("the config file is missing")) { try ConfigLoader.load(nil) }
+        #expect(throws: ConfigProblem("the config file is empty")) { try ConfigLoader.load(Data(" \n\t".utf8)) }
+        #expect(throws: ConfigProblem("the config file is empty")) { try ConfigLoader.load(Data()) }
+        #expect(try ConfigLoader.load(Data("{}".utf8)) == TipConfig())
+        #expect(try ConfigLoader.load(Data(#"{ theme: "nord" }"#.utf8)).theme == "nord")
+        #expect(throws: ConfigProblem.self) { try ConfigLoader.load(Data("{ bar: ".utf8)) }
+    }
+
+    @Test func commonItemKeys() {
+        // Keys every item reads: no "unknown key" for them.
+        let ok = Data(#"{ items: { clock: { provider: "clock", zones: ["Asia/Tokyo"], tooltip: "now", drawing: false } } }"#.utf8)
+        #expect(ConfigLoader.unknownKeys(ok).isEmpty)
+        // `popup` was listed but never read: flagged now.
+        #expect(ConfigLoader.unknownKeys(Data(#"{ items: { cpu: { provider: "cpu", popup: true } } }"#.utf8)) == ["items.cpu.popup"])
+    }
+
     @Test func itemsMergeOverDefaults() throws {
         let c = try ConfigLoader.decode(Data("""
         { items: { clock: { format: "HH:mm:ss" }, media: null, uptime: { command: "uptime", interval: 60 } } }
