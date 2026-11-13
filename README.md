@@ -159,6 +159,9 @@ The theme's radius and border carry over; glass brings its own rim and shadow. A
 out of a pill at its middle, a leaving one shrinks back into it, a resized one glides with its
 items, and a popup unfurls from the item's edge while the hover highlight glides between rows.
 All of it is Core Animation run by the window server: tip sets the end state and goes idle.
+`glassStyle` picks `"regular"` (frosted, like Spotlight) or `"clear"` (barely frosted), and
+`glassTint` (0–1, default 0.2) how much of the theme's colour tints it: low lets the wallpaper
+through as Spotlight does, 1 comes close to solid cards. Both are in Settings → Appearance.
 `glass: false` (Settings → Appearance → Liquid Glass) keeps the theme's solid cards;
 `bar.material: "glass"` adds one glass strip behind the whole bar. Reduce Motion or
 `animation.enabled: false` turns the motion off, not the glass.
@@ -184,6 +187,8 @@ and column, and suggests the key you probably meant.
 {
   theme: "og",
   glass: true,                             // Liquid Glass islands and popups; false: solid cards
+  glassStyle: "regular",                   // regular | clear
+  glassTint: 0.2,                          // 0–1: theme colour in the glass
   bar: { height: 40, margin: { left: 25, right: 34 } },
   island: { height: 28, gap: 6, padding: 10, spacing: 10, bare: ["apple"] },
 
