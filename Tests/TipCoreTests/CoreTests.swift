@@ -25,6 +25,14 @@ import Testing
         #expect(throws: ConfigProblem.self) { try ConfigLoader.load(Data("{ bar: ".utf8)) }
     }
 
+    @Test func commonItemKeys() {
+        // Keys every item reads: no "unknown key" for them.
+        let ok = Data(#"{ items: { clock: { provider: "clock", zones: ["Asia/Tokyo"], tooltip: "now", drawing: false } } }"#.utf8)
+        #expect(ConfigLoader.unknownKeys(ok).isEmpty)
+        // `popup` was listed but never read: flagged now.
+        #expect(ConfigLoader.unknownKeys(Data(#"{ items: { cpu: { provider: "cpu", popup: true } } }"#.utf8)) == ["items.cpu.popup"])
+    }
+
     @Test func itemsMergeOverDefaults() throws {
         let c = try ConfigLoader.decode(Data("""
         { items: { clock: { format: "HH:mm:ss" }, media: null, uptime: { command: "uptime", interval: 60 } } }

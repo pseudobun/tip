@@ -53,7 +53,8 @@ public enum ConfigTemplate {
       // defaults below; `name: null` removes one. Every item also takes click, rightClick,
       // scrollUp, scrollDown (actions: "zen", "popup", "toggle-label", "open:<url>", "app:<name>",
       // "shell:<cmd>", "paw:<command>", "hop:<args>", "tip:<command>", "media:toggle"),
-      // icon ("sf:<symbol>", "app:<bundle id>" or text), label, color and display
+      // icon ("sf:<symbol>", "app:<bundle id>" or text), label, color, tooltip, drawing
+      // (false hides the item and stops its provider) and display
       // ("all" | "main" | "builtin" | "external").
       items: {
         apple: { provider: "apple" },

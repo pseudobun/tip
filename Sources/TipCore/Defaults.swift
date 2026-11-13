@@ -62,7 +62,7 @@ public struct ProviderSpec: Sendable, Equatable {
 public enum ProviderCatalog {
     /// Keys every item understands.
     public static let common = ["provider", "click", "rightClick", "scrollUp", "scrollDown", "icon", "iconColor", "label", "color",
-                                "drawing", "display", "popup", "tooltip"]
+                                "drawing", "display", "tooltip"]
 
     public static func spec(_ id: String) -> ProviderSpec? { all.first { $0.id == id } }
 
@@ -104,6 +104,7 @@ public enum ProviderCatalog {
                          .init("format", .text, "HH:mm", "Time (Unicode date pattern)."),
                          .init("dateFormat", .text, "EEE dd", "Date before the time; empty for none."),
                          .init("timeZone", .text, "", "Time zone id; empty for the system's."),
+                         .init("zones", .list, [], "Other time zones the popup lists (\"America/New_York\")."),
                      ]),
         ProviderSpec(id: "battery", name: "Battery", summary: "Charge and power source.", symbol: "battery.75percent",
                      source: "IOPowerSources notifications", options: [
