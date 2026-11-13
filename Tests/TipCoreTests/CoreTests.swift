@@ -15,6 +15,16 @@ import Testing
         #expect(try ConfigLoader.decode(Data("{}".utf8)) == TipConfig())
     }
 
+    @Test func missingOrBlankFileIsAnError() throws {
+        // The app keeps its last good config instead of resetting to the defaults.
+        #expect(throws: ConfigProblem("the config file is missing")) { try ConfigLoader.load(nil) }
+        #expect(throws: ConfigProblem("the config file is empty")) { try ConfigLoader.load(Data(" \n\t".utf8)) }
+        #expect(throws: ConfigProblem("the config file is empty")) { try ConfigLoader.load(Data()) }
+        #expect(try ConfigLoader.load(Data("{}".utf8)) == TipConfig())
+        #expect(try ConfigLoader.load(Data(#"{ theme: "nord" }"#.utf8)).theme == "nord")
+        #expect(throws: ConfigProblem.self) { try ConfigLoader.load(Data("{ bar: ".utf8)) }
+    }
+
     @Test func itemsMergeOverDefaults() throws {
         let c = try ConfigLoader.decode(Data("""
         { items: { clock: { format: "HH:mm:ss" }, media: null, uptime: { command: "uptime", interval: 60 } } }

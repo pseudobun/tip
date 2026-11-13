@@ -1,29 +1,41 @@
 import Foundation
 
-/// Calls `onChange` (debounced, on the main actor) when a file changes, however it is
+/// Calls `onChange` (debounced, on the main actor) when one of `urls` changes, however it is
 /// saved: an editor that replaces the file shows up on its folder, an in-place write
-/// (VS Code, scripts) only on the file itself. The file is watched again after every
+/// (VS Code, scripts) only on the file itself. Each folder is watched once however many of the
+/// files live in it, and one save fires one callback. The files are watched again after every
 /// change, because a replaced file is a new inode.
 final class FileWatcher {
-    let url: URL
+    let urls: [URL]
     private let onChange: () -> Void
-    private var folder: DispatchSourceFileSystemObject?
-    private var file: DispatchSourceFileSystemObject?
+    private var folders: [DispatchSourceFileSystemObject] = []
+    private var files: [DispatchSourceFileSystemObject] = []
     private var pending: Task<Void, Never>?
 
-    init(url: URL, onChange: @escaping () -> Void) {
-        self.url = url
+    convenience init(url: URL, onChange: @escaping () -> Void) {
+        self.init(urls: [url], onChange: onChange)
+    }
+
+    init(urls: [URL], onChange: @escaping () -> Void) {
+        self.urls = urls
         self.onChange = onChange
-        folder = source(url.deletingLastPathComponent().path, [.write, .rename, .delete])
-        file = source(url.path, [.write, .extend, .rename, .delete])
+        var seen = Set<String>()
+        for dir in urls.map({ $0.deletingLastPathComponent().path }) where seen.insert(dir).inserted {
+            if let s = source(dir, [.write, .rename, .delete]) { folders.append(s) }
+        }
+        watchFiles()
     }
 
     func stop() {
         pending?.cancel()
-        folder?.cancel()
-        file?.cancel()
-        folder = nil
-        file = nil
+        (folders + files).forEach { $0.cancel() }
+        folders = []
+        files = []
+    }
+
+    private func watchFiles() {
+        files.forEach { $0.cancel() }
+        files = urls.compactMap { source($0.path, [.write, .extend, .rename, .delete]) }
     }
 
     private func source(_ path: String, _ mask: DispatchSource.FileSystemEvent) -> DispatchSourceFileSystemObject? {
@@ -42,8 +54,7 @@ final class FileWatcher {
         pending = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(200))
             guard let self, !Task.isCancelled else { return }
-            file?.cancel()
-            file = source(url.path, [.write, .extend, .rename, .delete])
+            watchFiles()
             onChange()
         }
     }
