@@ -161,7 +161,7 @@ final class BarManager: ProviderHost {
 
     private func isShown(_ node: String, on d: DisplayInfo) -> Bool {
         let id = item(of: node)
-        guard isShown(node) else { return false }
+        guard isShown(node), store.config.items[id]?.bool("drawing", true) != false else { return false }
         switch store.config.items[id]?.string("display", "all") ?? "all" {
         case "main": return d.isMain
         case "builtin": return d.builtin
@@ -188,6 +188,8 @@ final class BarManager: ProviderHost {
                 c?.drawing = d
             }
         }
+        // The config's `tooltip` over the provider's (a `tip set` tooltip wins over both).
+        if let t = store.config.items[item(of: node)]?.string("tooltip"), overrides[node]?.tooltip == nil { c?.tooltip = t }
         return c
     }
 
@@ -202,8 +204,13 @@ final class BarManager: ProviderHost {
         return out
     }
 
+    /// The icon gap the contents were built with: providers and plugins bake it into their parts.
+    private var builtGap: CGFloat?
+
     private func syncProviders() {
         let visible = visibleItems
+        let gapChanged = builtGap != nil && builtGap != iconGap
+        builtGap = iconGap
         for (id, cfg) in store.config.items {
             let kind = cfg.provider
             guard kind != "plugin", let cls = Provider.make(kind) else { continue }
@@ -211,8 +218,14 @@ final class BarManager: ProviderHost {
             if let p = providers[id] {
                 if ObjectIdentifier(Swift.type(of: p)) != ObjectIdentifier(cls) {
                     p.stop()
+                    // The old provider's content (and per-display content, which wins) must not
+                    // show under the new one until it sets its own.
+                    contents[id] = nil
+                    perDisplay[id] = nil
+                    graphs[id] = nil
                     providers[id] = cls.init(id: id, options: options, host: self)
-                } else if p.options != options {
+                } else if p.options != options || gapChanged {
+                    // Restarting a running provider redraws it with the new gap.
                     p.reconfigure(options)
                 }
             } else {
@@ -226,6 +239,7 @@ final class BarManager: ProviderHost {
             contents[id] = nil
             perDisplay[id] = nil
         }
+        if gapChanged { pluginSpecs.keys.forEach(showPluginItem) }
         plugins.visibilityChanged(visible)
     }
 
@@ -268,9 +282,26 @@ final class BarManager: ProviderHost {
             graphs[node] = ring
             pluginGraphSpec[node] = g
         }
-        var full = merged
+        showPluginItem(node)
+    }
+
+    /// Draws what a plugin last set for `node` (again: after an icon gap change).
+    private func showPluginItem(_ node: String) {
+        guard var full = pluginSpecs[node] else { return }
         full.graph = pluginGraphSpec[node]
         set(node, .from(full, graph: graphs[node]?.values, gap: iconGap), display: nil)
+    }
+
+    /// A plugin's items newly shown under the config key `to`: what it last set under `from`,
+    /// instead of blank until its next `set`.
+    func copyPluginItems(from: String, to: String) {
+        for (node, spec) in pluginSpecs where node.hasPrefix(from + ".") {
+            let target = to + node.dropFirst(from.count)
+            pluginSpecs[target] = spec
+            pluginGraphSpec[target] = pluginGraphSpec[node]
+            graphs[target] = graphs[node]
+            showPluginItem(target)
+        }
     }
 
     private var pluginSpecs: [String: ItemSpec] = [:]
@@ -317,6 +348,10 @@ final class BarManager: ProviderHost {
     // MARK: Input
 
     func handle(_ trigger: Trigger, node: String, tag: String?, bar: Bar, modifiers: NSEvent.ModifierFlags) {
+        if node == Bar.errorNode {
+            if trigger == .click || trigger == .rightClick { (NSApp.delegate as? AppDelegate)?.tipCommand("settings") }
+            return
+        }
         let id = item(of: node)
         let cfg = store.config.items[id]
         let content = self.content(node, display: bar.display.id)

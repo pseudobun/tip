@@ -314,8 +314,21 @@ public struct ConfigProblem: Error, Equatable, Sendable, CustomStringConvertible
 }
 
 public enum ConfigLoader {
+    /// The config file as the app reads it: a missing (nil) or blank file is a problem, not the
+    /// defaults, so a save that truncates the file or a deleted symlink target keeps the last
+    /// good config instead of resetting the bar.
+    public static func load(_ data: Data?) throws -> TipConfig {
+        guard let data else { throw ConfigProblem("the config file is missing") }
+        if isBlank(data) { throw ConfigProblem("the config file is empty") }
+        return try decode(data)
+    }
+
+    public static func isBlank(_ data: Data) -> Bool {
+        data.allSatisfy { $0 == 0x20 || $0 == 0x0a || $0 == 0x09 || $0 == 0x0d }
+    }
+
     public static func decode(_ data: Data) throws -> TipConfig {
-        if data.allSatisfy({ $0 == 0x20 || $0 == 0x0a || $0 == 0x09 || $0 == 0x0d }) { return TipConfig() }
+        if isBlank(data) { return TipConfig() }
         let decoder = JSONDecoder()
         decoder.allowsJSON5 = true
         do {

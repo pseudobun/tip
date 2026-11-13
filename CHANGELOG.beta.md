@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-beta.6](https://github.com/pseudobun/tip/compare/v0.1.0-beta.5...v0.1.0-beta.6) (2026-11-13)
+
+
+### Bug Fixes
+
+* **config:** apply every config change live and surface config errors ([#13](https://github.com/pseudobun/tip/issues/13)) ([168f64c](https://github.com/pseudobun/tip/commit/168f64c18ca3f5404c4c3fcabce682eb7818b5d0))
+
 ## [0.1.0-beta.5](https://github.com/pseudobun/tip/compare/v0.1.0-beta.4...v0.1.0-beta.5) (2026-11-13)
 
 

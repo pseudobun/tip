@@ -217,7 +217,8 @@ zones. Displays narrower than `bar.minCenterWidth` hide the center zone.
 
 **Items.** `provider` picks a built-in (table above), `plugin` shows a plugin's items, `command`
 makes a script item. Every item also takes `click`, `rightClick`, `scrollUp`, `scrollDown`, `icon`
-(`"sf:<SF Symbol>"`, `"app:<bundle id>"`, a file or text), `label`, `color` and `display`
+(`"sf:<SF Symbol>"`, `"app:<bundle id>"`, a file or text), `label`, `color`, `tooltip` (over the
+provider's own), `drawing` (`false` hides the item and stops its provider) and `display`
 (`all`, `main`, `builtin`, `external` or a name). Settings → Items lists each provider's options.
 
 **Actions.** `zen`, `popup`, `toggle-label`, `open:<url or path>`, `app:<name>`, `shell:<command>`,

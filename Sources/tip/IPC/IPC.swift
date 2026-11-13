@@ -80,11 +80,41 @@ enum IPC {
         return .notRunning
     }
 
-    static func stream(_ command: String, socketPath: String, onLine: (String) -> Void) -> ClientError {
+    /// Lets another thread end a stream blocked in `read`: `cancel` shuts the socket down.
+    final class StreamHandle: @unchecked Sendable {
+        private let lock = NSLock()
+        private var fd: Int32 = -1
+        private var cancelled = false
+
+        /// false: cancelled before the stream started.
+        fileprivate func attach(_ fd: Int32) -> Bool {
+            lock.withLock {
+                guard !cancelled else { return false }
+                self.fd = fd
+                return true
+            }
+        }
+
+        fileprivate func detach() { lock.withLock { fd = -1 } }
+
+        func cancel() {
+            lock.withLock {
+                cancelled = true
+                if fd >= 0 { shutdown(fd, SHUT_RDWR) }
+            }
+        }
+    }
+
+    static func stream(_ command: String, socketPath: String, handle: StreamHandle? = nil, onLine: (String) -> Void) -> ClientError {
         guard FileManager.default.fileExists(atPath: socketPath) else { return .notRunning }
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return .failed("socket: \(String(cString: strerror(errno)))") }
         defer { close(fd) }
+        if let handle {
+            guard handle.attach(fd) else { return .failed("cancelled") }
+        }
+        // Runs before the close above: a late cancel never shuts down a reused descriptor.
+        defer { handle?.detach() }
         configure(fd, timeout: 5)
         guard var addr = address(socketPath) else { return .failed("socket path too long") }
         let connected = withUnsafePointer(to: &addr) {
