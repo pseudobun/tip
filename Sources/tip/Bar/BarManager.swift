@@ -36,7 +36,7 @@ final class BarManager: ProviderHost {
     init(store: ConfigStore) {
         self.store = store
         style = Style(theme: store.theme(store.config.theme), island: store.config.island, barHeight: store.config.bar.height,
-                      glass: store.config.glass)
+                      glass: store.config.glass, glassClear: store.config.glassStyle == "clear", glassAmount: store.config.glassTint)
         plugins = PluginHost()
         plugins.manager = self
         popup.onAction = { [weak self] row in self?.popupRowPicked(row) }
@@ -75,7 +75,8 @@ final class BarManager: ProviderHost {
 
     private func restyle(redraw: Bool = true) {
         let theme = previewTheme ?? store.theme(store.config.theme)
-        let next = Style(theme: theme, island: store.config.island, barHeight: store.config.bar.height, glass: store.config.glass)
+        let next = Style(theme: theme, island: store.config.island, barHeight: store.config.bar.height, glass: store.config.glass,
+                         glassClear: store.config.glassStyle == "clear", glassAmount: store.config.glassTint)
         guard next != style else { return }
         let themeChanged = next.theme != style.theme
         style = next
