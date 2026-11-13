@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.0-beta.4](https://github.com/pseudobun/tip/compare/v0.1.0-beta.3...v0.1.0-beta.4) (2026-11-13)
+
+
+### Bug Fixes
+
+* **bar:** let the system menu bar cover tip when it slides down ([48f94de](https://github.com/pseudobun/tip/commit/48f94de152bff9448b209f7ef3e41d202e0e5295))
+* **sdk:** run the main run loop so plugin timers fire ([5c12f90](https://github.com/pseudobun/tip/commit/5c12f90067739b89ef5c74d950610bfb9bd479b7))
+
 ## [0.1.0-beta.3](https://github.com/pseudobun/tip/compare/v0.1.0-beta.2...v0.1.0-beta.3) (2026-11-13)
 
 
