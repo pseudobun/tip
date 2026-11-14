@@ -184,6 +184,23 @@ final class Rows {
         return f
     }
 
+    /// `field` with an app picker button beside it. A pick fills the field (`multiple`: appends to
+    /// its comma-separated list) and commits it like a finished edit; typing still works.
+    func appField(_ field: NSTextField, multiple: Bool) -> NSStackView {
+        let pick = AppPicker.button { b in
+            let current = field.stringValue.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            AppPicker.show(from: b, multiple: multiple, exclude: multiple ? Set(current) : []) { apps in
+                let names = apps.map(\.name)
+                field.stringValue = (multiple ? current + names : [names[0]]).joined(separator: ", ")
+                if let action = field.action { NSApp.sendAction(action, to: field.target, from: field) }
+            }
+        }
+        let s = NSStackView(views: [field, pick])
+        s.spacing = 8
+        s.alignment = .centerY
+        return s
+    }
+
     func number(_ value: Double, range: ClosedRange<Double>, step: Double = 1, _ change: @escaping (Double) -> Void) -> NSView {
         let f = NSTextField(string: Self.fmt(value))
         f.font = SettingsTheme.mono(12)

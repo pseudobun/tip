@@ -144,11 +144,13 @@ extension SettingsController {
         case .choice:
             control = rows.popup(opt.choices, current.string ?? opt.choices.first ?? "") { [unowned self] v in write(path, ConfigEdit.literal(v)) }
         case .list:
-            control = rows.field((current.strings ?? []).joined(separator: ", "), width: 260, mono: true) { [unowned self] v in
+            let f = rows.field((current.strings ?? []).joined(separator: ", "), width: 260, mono: true) { [unowned self] v in
                 write(path, ConfigEdit.literal(v.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }))
             }
+            control = opt.apps ? rows.appField(f, multiple: true) : f
         case .text, .rows:
-            control = rows.field(current.string ?? "", width: 260, mono: true) { [unowned self] v in write(path, ConfigEdit.literal(v)) }
+            let f = rows.field(current.string ?? "", width: 260, mono: true) { [unowned self] v in write(path, ConfigEdit.literal(v)) }
+            control = opt.apps ? rows.appField(f, multiple: false) : f
         }
         return rows.row(opt.key, opt.help, control)
     }

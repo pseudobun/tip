@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-beta.8](https://github.com/pseudobun/tip/compare/v0.1.0-beta.7...v0.1.0-beta.8) (2026-11-14)
+
+
+### Features
+
+* **settings:** add an app picker to app list fields ([#19](https://github.com/pseudobun/tip/issues/19)) ([ea87128](https://github.com/pseudobun/tip/commit/ea87128a3de8f021ab1f640404efa9effd9c9e51))
+
 ## [0.1.0-beta.7](https://github.com/pseudobun/tip/compare/v0.1.0-beta.6...v0.1.0-beta.7) (2026-11-13)
 
 
