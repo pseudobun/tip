@@ -38,12 +38,15 @@ public struct ProviderSpec: Sendable, Equatable {
         public let fallback: JSONValue
         public let help: String
         public let choices: [String]
-        public init(_ key: String, _ kind: Kind, _ fallback: JSONValue, _ help: String, choices: [String] = []) {
+        /// The text or list holds app names (as macOS shows them): Settings adds an app picker.
+        public let apps: Bool
+        public init(_ key: String, _ kind: Kind, _ fallback: JSONValue, _ help: String, choices: [String] = [], apps: Bool = false) {
             self.key = key
             self.kind = kind
             self.fallback = fallback
             self.help = help
             self.choices = choices
+            self.apps = apps
         }
     }
 
@@ -74,7 +77,7 @@ public enum ProviderCatalog {
         ProviderSpec(id: "workspaces", name: "Workspaces", summary: "paw's workspaces and their apps, per display.",
                      symbol: "square.grid.3x1.below.line.grid.1x2", source: "paw event stream (socket)", options: [
                          .init("appsPerWorkspace", .number, 6, "App icons per workspace."),
-                         .init("ignore", .list, ["Screen Studio", "Raycast", "Dropover"], "Apps never shown."),
+                         .init("ignore", .list, ["Screen Studio", "Raycast", "Dropover"], "Apps never shown.", apps: true),
                          .init("showEmpty", .toggle, true, "Show workspaces without windows."),
                          .init("creator", .toggle, true, "A + that makes a new workspace."),
                          .init("iconSize", .number, 16, "App icon size (points)."),
