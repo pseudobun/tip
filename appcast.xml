@@ -6,6 +6,18 @@
     <description>tip releases</description>
     <language>en</language>
     <item>
+      <title>tip 0.1.0-beta.8</title>
+      <pubDate>Sat, 14 Nov 2026 12:27:37 +0000</pubDate>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>0.1.0-beta.8</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<style>body{font:13px -apple-system,sans-serif;margin:12px 14px;color:#222}h3{font-size:13px;margin:12px 0 4px}ul{padding-left:18px;margin:4px 0}li{margin:2px 0}code{font:12px ui-monospace,monospace}a{color:#0a64d0}@media(prefers-color-scheme:dark){body{color:#ddd}a{color:#6ab0ff}}</style><h3>Features</h3>
+<ul>
+<li><b>settings:</b> add an app picker to app list fields (<a href="https://github.com/pseudobun/tip/issues/19">#19</a>) (<a href="https://github.com/pseudobun/tip/commit/ea87128a3de8f021ab1f640404efa9effd9c9e51">ea87128</a>)</li>
+</ul><p><a href="https://github.com/pseudobun/tip/releases/tag/v0.1.0-beta.8">Release on GitHub</a></p>]]></description>
+      <enclosure url="https://github.com/pseudobun/tip/releases/download/v0.1.0-beta.8/tip-0.1.0-beta.8-macos.zip" type="application/octet-stream" sparkle:edSignature="gpPqtDir4inwbeXLYe0JPR/mQ16pqJw0A76UN71arcZia7CT+jeEE/z0lhPOEerKSKD9UoT0gaBDdcxFCGGOCg==" length="2479706"/>
+    </item>
+    <item>
       <title>tip 0.1.0-beta.7</title>
       <pubDate>Fri, 13 Nov 2026 21:01:08 +0000</pubDate>
       <sparkle:version>21</sparkle:version>
