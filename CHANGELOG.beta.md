@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-beta.9](https://github.com/pseudobun/tip/compare/v0.1.0-beta.8...v0.1.0-beta.9) (2026-11-15)
+
+
+### Bug Fixes
+
+* **render:** raise ▲ and lower ▼ in an item's detail ([#22](https://github.com/pseudobun/tip/issues/22)) ([a81a5f2](https://github.com/pseudobun/tip/commit/a81a5f2791bac37d00d09b1d6b631b8ea3ed685b))
+
 ## [0.1.0-beta.8](https://github.com/pseudobun/tip/compare/v0.1.0-beta.7...v0.1.0-beta.8) (2026-11-14)
 
 
