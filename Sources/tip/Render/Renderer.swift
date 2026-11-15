@@ -146,7 +146,7 @@ enum Renderer {
             let a = attributed(s, t, style)
             let f = style.font(t)
             // Centre on the cap height so mixed fonts share a baseline feel.
-            let y = midY - (f.ascender + f.descender) / 2
+            let y = midY - (f.ascender + f.descender) / 2 + t.rise
             a.draw(at: CGPoint(x: x, y: y + f.descender))
         case .stack(let top, let bottom, _):
             draw(top, at: x, width: width(top, style), midY: midY + 6, style: style, ctx: ctx, hits: &hits)

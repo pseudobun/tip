@@ -38,6 +38,8 @@ struct TextStyle: Hashable {
     var color: Paint = .fg
     /// The theme's font (mono for most themes); false: the system font.
     var themed = true
+    /// Points to shift the text up (negative: down) from the centred position.
+    var rise: CGFloat = 0
 
     static func label(_ color: Paint = .fg) -> TextStyle { TextStyle(size: 12, weight: .medium, color: color) }
     static func bold(_ color: Paint = .fg, size: CGFloat = 12) -> TextStyle { TextStyle(size: size, weight: .bold, color: color) }
@@ -105,6 +107,8 @@ extension ItemContent {
         return ItemContent(parts: parts, collapsibleFrom: collapsible && icon != nil ? 1 : nil)
     }
 
+    private static let arrowRise: [Character: CGFloat] = ["▲": 3, "△": 3, "▼": -3, "▽": -3]
+
     /// The content a plugin or `tip set` spec describes.
     static func from(_ s: ItemSpec, graph: [Double]?, gap: CGFloat) -> ItemContent {
         var parts: [Part] = []
@@ -125,7 +129,18 @@ extension ItemContent {
         }
         if let detail = s.detail, !detail.isEmpty {
             if !parts.isEmpty { parts.append(.space(3)) }
-            parts.append(.text(detail, TextStyle(size: 10.5, weight: .medium, color: s.detailColor.flatMap(Paint.parse) ?? .secondary)))
+            let style = TextStyle(size: 10.5, weight: .medium, color: s.detailColor.flatMap(Paint.parse) ?? .secondary)
+            // A leading ▲/▼ sits high/low, so the direction reads at a glance.
+            if let arrow = detail.first, let rise = Self.arrowRise[arrow] {
+                var a = style
+                a.size = 9
+                a.rise = rise
+                parts.append(.text(String(arrow), a))
+                let rest = String(detail.dropFirst())
+                if !rest.isEmpty { parts.append(.space(1)); parts.append(.text(rest, style)) }
+            } else {
+                parts.append(.text(detail, style))
+            }
         }
         return ItemContent(parts: parts, drawing: s.drawing ?? true, tooltip: s.tooltip, popup: s.popup, click: s.click, rightClick: s.rightClick)
     }
